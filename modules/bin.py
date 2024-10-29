@@ -8,10 +8,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.select import Select
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.common.exceptions import UnexpectedAlertPresentException, NoSuchElementException, TimeoutException, NoAlertPresentException, JavascriptException
+import undetected_chromedriver as uc
 from typing import TypedDict, Any, Callable
 from types import MethodType
 import hashlib
+import requests
+import json
 
 os.environ['HTTPS_PROXY'] = ''
 os.environ['HTTP_PROXY'] = ''
@@ -222,6 +226,8 @@ class CsBasicComponent:
         raise AttributeError(f"'{self.__class__.__name__}' '{name}' was not set")
 
 class CsMyDriverComponent:
+    def __init__(self):
+        self.responses = []
     def _select_change_value(self, By_locator: str, locator: str, new_value: str) -> None:
         _select_element = WebDriverWait(self, 20).until(EC.element_to_be_clickable((By_locator, locator)))
         _select_element = Select(_select_element)  # Create a Select instance
@@ -252,6 +258,19 @@ class CsMyDriverComponent:
                     return element.text
         except NoSuchElementException:
             return error_return
+    def _get_response(self, url):
+        self.get(url)
+        # Parse the Chrome Performance logs
+        response = None
+        for log_entry in self.get_log("performance"):
+            log_message = json.loads(log_entry["message"])["message"]
+            # Filter out HTTP responses
+            if log_message["method"] == "Network.responseReceived":
+                self.responses.append(log_message["params"]["response"])
+                if log_message["params"]["type"] == "Document":
+                    response = log_message["params"]["response"]
+        return response
+
 
 class CsMyEdgeDriverInit:
     def __init__(self, user_data_dir):
@@ -450,17 +469,20 @@ class CsMultiLoaderEntry:
         getattr(self, task + '_handler')(source = source, **kwargs)
 
 def cs_factory(dic_cs: dict):
-    # create class skelton
-    class _Cs(*dic_cs):
-        __slots__ = {slot for base in dic_cs if hasattr(base, '__slots__') for slot in getattr(base, '__slots__')}
-        def __init__(self, *args, **kwargs):
-        # set attributes
-            for Cs, config in dic_cs.items():
-                if config is None: continue
-                default_args, default_kwargs = config.get('default_args', set()), config.get('default_kwargs', {})
-                _args = default_args - {'args', 'kwargs'} | set(args) if 'args' in default_args else default_args - {'kwargs'}
-                _kwargs = default_kwargs | kwargs if 'kwargs' in default_args else {key: kwargs.get(key, value) for key, value in default_kwargs.items()}
-                Cs.__init__(self, *_args, **_kwargs)
-    return _Cs
+    bases = tuple(dic_cs.keys())
+    slots = {slot for base in bases if hasattr(base, '__slots__') for slot in getattr(base, '__slots__')}
+
+    # Define the dynamic class with type
+    def init(self, *args, **kwargs):
+        for Cs, config in dic_cs.items():
+            if config is None:
+                continue
+            _args = config.get('default_args', []) + [*args] if config.get('all_args', False) else []
+            _kwargs = config.get('default_kwargs', {}) | kwargs if config.get('all_kwargs', False) else {}
+            Cs.__init__(self, *_args, **_kwargs)
+
+    # Create the class with type
+    return type('_Cs', bases, {'__slots__': slots, '__init__': init})
+
 
 
