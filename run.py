@@ -1,8 +1,8 @@
 from modules.uploader import *
 
-CsUCdriver = cs_factory(dic_uploaderSimple_config)
-UCdriver = CsUCdriver()
-UCdriver._login()
-UCdriver._upload_to_google_photo()
-UCdriver.quit()
+CsUCUploader = cs_factory(dic_uploader_config)
+UCuploader = CsUCUploader()
+UCuploader.login()
+UCuploader.upload_to_google_photo()
+UCuploader.quit()
 

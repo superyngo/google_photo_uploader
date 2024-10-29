@@ -226,8 +226,6 @@ class CsBasicComponent:
         raise AttributeError(f"'{self.__class__.__name__}' '{name}' was not set")
 
 class CsMyDriverComponent:
-    def __init__(self):
-        self.responses = []
     def _select_change_value(self, By_locator: str, locator: str, new_value: str) -> None:
         _select_element = WebDriverWait(self, 20).until(EC.element_to_be_clickable((By_locator, locator)))
         _select_element = Select(_select_element)  # Create a Select instance
@@ -258,6 +256,38 @@ class CsMyDriverComponent:
                     return element.text
         except NoSuchElementException:
             return error_return
+
+class CsMyUCDriveWithUserAgentAndGetResponseInit:
+    def __init__(self, bool_headless=False, user_data_dir=None):
+        self.responses = []
+        options = uc.ChromeOptions()
+        options.unhandled_prompt_behavior = 'accept'
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        if bool_headless:
+            options.add_argument('--headless')  # Enable headless mode
+            options.add_argument('--disable-gpu')  # Disable GPU rendering
+        options.add_argument("--disable-infobars")
+        options.add_argument("--disable-extensions")
+
+        # user agent
+        latest_user_agent = requests.get('http://headers.scrapeops.io/v1/user-agents?api_key=5f0dd055-a569-430e-a964-e49d53548856').json()
+        options.add_argument(f"--user-agent={latest_user_agent['result'][0]}")
+        
+        # Enable Chrome DevTools Protocol
+        # https://developer.chrome.com/docs/chromedriver/logging/performance-log
+        options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+        caps = DesiredCapabilities.CHROME
+        caps['goog:loggingPrefs'] = {'performance': 'ALL'}
+
+        config = {
+            'desired_capabilities': caps,
+            'options': options,
+            'use_subprocess': False
+        } | {'user_data_dir': user_data_dir} if user_data_dir else {}
+        
+        super(type(self),self).__init__(**config)
+
     def _get_response(self, url):
         self.get(url)
         # Parse the Chrome Performance logs
@@ -270,7 +300,6 @@ class CsMyDriverComponent:
                 if log_message["params"]["type"] == "Document":
                     response = log_message["params"]["response"]
         return response
-
 
 class CsMyEdgeDriverInit:
     def __init__(self, user_data_dir):
