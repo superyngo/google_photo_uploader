@@ -33,7 +33,7 @@ class CsMyUCGooglePhotoUploader:
         if not self.driver:self._start_driver(False) 
         login_url = 'https://photos.google.com/login'
         self.driver.get(login_url)
-        _wait = self.driver._wait_element(By.XPATH, '//input[@type="text"]')
+        _wait = self.driver._wait_element(By.XPATH, '//input[@type="text"]', condition=EC.element_to_be_clickable)
     def load_config(self):
         # Load the config data if the file exists
         if self.config_file.exists():
@@ -56,7 +56,7 @@ class CsMyUCGooglePhotoUploader:
         print(f"Configuration saved to: {self.config_file}")
     def handler(self) -> None:
         pass
-    def upload_to_google_photo(self, bool_headless = False) -> str:
+    def upload_to_google_photo(self, bool_headless=False) -> str:
         if not self.driver:self._start_driver(bool_headless)
         res = self.driver._get_response(self.config_data['album_url'])
 
@@ -75,12 +75,13 @@ class CsMyUCGooglePhotoUploader:
         # Interact with the input element
         _upload_click = self.driver._wait_element(By.XPATH, '//span[text()="從電腦中選取"]').click()
         print("從電腦中選取")
-        _wait_file_input = self.driver.find_element(By.XPATH, '//input[@type="file"]')
+        file_input = self.driver.find_element(By.XPATH, '//input[@type="file"]')
         files_path = self._list_mkv_files(self.config_data['mideo_folder'])
-        _wait_file_input = self.driver.send_keys(files_path)
+        file_input.send_keys(files_path)
         self.driver._wait_element(By.XPATH, f"//div[contains(text(), '你已備份')]")
         print('Upload successfully')
         self.driver.quit()
+        self.driver = None
     def _list_mkv_files(self, mideo_folder) -> str:
         # Get all .mkv files in the folder
         mkv_files = [mideo_folder + '\\' + file for file in os.listdir(mideo_folder) if file.endswith('.mkv')]
