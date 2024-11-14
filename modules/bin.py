@@ -125,12 +125,11 @@ def cs_factory(dic_cs: dict):
 
     # Define the dynamic class with type
     def init(self, *args, **kwargs):
-        # config = {'default_args':[],'all_args':bool,'default_kwargs':{},'all_kwargs':bool}
+        # config = {'default_args': [],'all_args': bool,'default_kwargs': {},'all_kwargs': bool}
         for Cs, config in dic_cs.items():
             if config is None:
                 continue
             _args = config.get('default_args', []) + [*args] if config.get('all_args', False) else []
-            _kwargs = config.get('default_kwargs', {}) | kwargs if config.get('all_kwargs', False) else {}
             _kwargs = config.get('default_kwargs', {}) | kwargs if config.get('all_kwargs', False) else {key: kwargs.get(key, value) for key, value in config.get('default_kwargs', {}).items()}
 
             Cs.__init__(self, *_args, **_kwargs)
