@@ -1,1 +1,1 @@
-import
+print(__file__)
