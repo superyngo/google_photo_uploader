@@ -14,3 +14,5 @@ asetpts='if(lt(N,10),PTS+3/TB,PTS)'
 ffmpeg -i 20241117_cut.mp4 -filter_complex "
 [0:v]setpts=if(gte(mod(n,2382),40),0.01*PTS[v],PTS[v]):if(gte(t,10),-h,-h)
 " output.mp4
+
+ffmpeg -i 20241117_cut.mp4 -vf "select='if(lte(mod(n,2382),39.7),1,not(mod(n,99.25)))',setpts=N/FRAME_RATE/TB" -af "aselect='if(lte(mod(n,2382),39.7),1,not(mod(n,99.25)))',asetpts=N/SR/TB" -shortest -vsync vfr output.mkv
