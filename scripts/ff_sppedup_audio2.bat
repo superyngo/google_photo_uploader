@@ -3,8 +3,8 @@
 
 REM Set the interval 
 set "fps=19.85"
-set "interval=150"
-set "lasting=1"
+set "interval=120"
+set "lasting=2"
 
 
 REM Precompute FFmpeg expressions
