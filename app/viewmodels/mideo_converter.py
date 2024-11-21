@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from typing import LiteralString
 import ffmpeg
 from app.utils.logger import logger
+type GroupedVideos = dict[str, dict[int,str]]
 
 # Function to extract epoch time from filename
 def extract_epoch(filename: str) -> int | None:
@@ -11,7 +12,6 @@ def extract_epoch(filename: str) -> int | None:
     except (IndexError, ValueError) as e:
         logger.error(f"Failed to extract epoch from {filename}: {str(e)}")
         return None
-
 
 def list_video_files(root_path: str, valid_extensions: set[str]|None=None) -> list[str]: 
     if valid_extensions is None:
@@ -25,8 +25,8 @@ def list_video_files(root_path: str, valid_extensions: set[str]|None=None) -> li
     
     return video_files
 
-def group_files_by_date(video_files: list[str], day_start_hour: int=0) -> dict[str, dict[int, str]]:
-    grouped_files: dict[str, dict[int, str]] = {}
+def group_files_by_date(video_files: list[str], start_hour: int=0) -> GroupedVideos:
+    grouped_files: GroupedVideos = {}
 
     for video_path in video_files:
         filename: str = os.path.basename(video_path)
@@ -37,7 +37,7 @@ def group_files_by_date(video_files: list[str], day_start_hour: int=0) -> dict[s
             continue
         else:
             file_datetime: datetime = datetime.fromtimestamp(epoch_time)
-            if file_datetime.hour < day_start_hour:
+            if file_datetime.hour < start_hour:
                 file_datetime -= timedelta(days=1)
             date_key: str = file_datetime.strftime('%Y%m%d')
 
@@ -59,85 +59,144 @@ def is_valid_video(file_path) -> bool:
         logger.info(message)
         return False
 
-# Path to your video folders
-base_path: LiteralString = os.path.join('C:', 'Users', 'user', 'Downloads')
-
-video_files: list[str] = list_video_files(base_path)
-
-for date_str, hours in grouped_folders.items():
-    if date_str >= today:
-        message = f"Skipping today's or future date: {date_str}"
-        logger.info(message)
-        continue
-
-    if not hours:
-        message = f"No hours to process for {date_str}. Skipping."
-        logger.info(message)
-        continue
-
-    input_files = []
-    first_video_epoch = None
-
-    for hour in hours:
-        hour_path = os.path.join(base_path, hour)
-        videos = sorted([v for v in os.listdir(hour_path) if v.endswith('.mp4')])
-
-        for video in videos:
-            video_path = os.path.join(hour_path, video)
-            if is_valid_video(video_path):
-                if not first_video_epoch:
-                    first_video_epoch = extract_epoch(video)
-                input_files.append(video_path)
-
-    if not input_files:
-        message = f"No valid videos found for {date_str}. Skipping."
-        logger.info(message)
-        continue
-
-    # Create a temporary text file for ffmpeg input
-    with open('input.txt', 'w') as f:
-        for file in input_files:
-            f.write(f"file '{file}'\n")
-
-    # Define the output file
-    output_file = os.path.join(base_path, f"{date_str}.mkv")
-
-    # Run ffmpeg command to concatenate videos without re-encoding using ffmpeg-python
-    try:
-        # Run ffmpeg command to concatenate videos without re-encoding
-        ffmpeg.input('input.txt', format='concat', safe=0).output(output_file, c='copy').run()
-    except ffmpeg.Error as e:
-        message = f"Failed to concatenate videos for {date_str}. Error: {e.stderr.decode()}"
-        logger.error(message)
-        continue
-
-    # Remove the temporary text file
-    os.remove('input.txt')
-
-    # Set the creation and modification time of the output file to the first video's epoch time
-    if first_video_epoch:
-        os.utime(output_file, (first_video_epoch, first_video_epoch))
-
-    # Delete original video files and folders
-    try:
-        for hour in hours:
-            hour_path = os.path.join(base_path, hour)
-            for video in os.listdir(hour_path):
-                os.remove(os.path.join(hour_path, video))
-            os.rmdir(hour_path)
-    except OSError as e:
-        message = f"Failed to delete files or directories for {date_str}: {str(e)}"
-        logger.error(message)
-        continue
-
-    message = f"Processed {date_str}, saved to {output_file}, set timestamps, and deleted original files."
-    logger.info(message)
+def merge_videos(video_dict: GroupedVideos, base_path: str) -> int:
+    today = datetime.now().strftime('%Y%m%d')
+    dir_to_delete: set = set()
     
+    for date_str, videos in video_dict.items():
+        dir_to_delete.clear()
+        
+        if date_str == today:
+            logger.info(f"Skipping today's date: {date_str}")
+            continue
+        
+        # Sort the videos by epoch time
+        sorted_videos = dict(sorted(videos.items()))
+        
+        # Prepare the input file list for ffmpeg
+        input_files = []
+        for epoch_time, video_path in sorted_videos.items():
+            if is_valid_video(video_path):
+                input_files.append(video_path)
+                dir_to_delete.add(os.path.dirname(video_path))
+                
+        if not input_files:
+            logger.info(f"No valid videos found for {date_str}. Skipping.")
+            continue
+        
+        # Write the input file list for ffmpeg
+        with open('input.txt', 'w') as f:
+            for file in input_files:
+                f.write(f"file '{file}'\n")
+        
+        # Define the output file path
+        output_file = os.path.join(base_path, f"{date_str}.mkv")
+        
+        try:
+            # Use ffmpeg to concatenate videos
+            ffmpeg.input('input.txt', format='concat', safe=0).output(output_file, c='copy').run()
+        except ffmpeg.Error as e:
+            logger.error(f"Failed to concatenate videos for {date_str}. Error: {e.stderr.decode()}")
+            return 1
+        
+        # Remove the temporary input file list
+        os.remove('input.txt')
+        
+        # Set the file's timestamp to the first video's epoch time
+        first_video_epoch = next(iter(sorted_videos))
+        os.utime(output_file, (first_video_epoch, first_video_epoch))
+        
+        # Clean up original video files and directories
+        try:
+            for epoch_time, video_path in sorted_videos.items():
+                os.remove(video_path)
+            for dir in dir_to_delete:
+                os.rmdir(dir)
+        except OSError as e:
+            logger.error(f"Failed to delete files or directories for {date_str}: {str(e)}")
+            return 2
+    
+        logger.info(f"Processed {date_str}, saved to {output_file}, set timestamps, and deleted original files.")
+    
+    return 0
 
-# create a merge video functions as decribed below:
-# 1.take a dictionary as input and int as output for 0 is success and other erro codes.
-# 2.loop through the dictionay
-# 3.if the key as a date equals today then log message and continue
-# 4.for rest keys as date do below
-# a.sort the values as dictionay by the keys as epoth int
-# b.do something to the sorted dictionary
+def main() -> None:
+    base_path: LiteralString = os.path.join('H:', 'data', '94f827b4b94e')
+
+    video_files: list[str] = list_video_files(base_path)
+    
+    grouped_videos: GroupedVideos = group_files_by_date(video_files, 5)
+    
+    do_merge: int = merge_videos(grouped_videos, base_path)
+
+if __name__ == '__main__':
+    main()
+# for date_str, hours in grouped_folders.items():
+#     if date_str >= today:
+#         message = f"Skipping today's or future date: {date_str}"
+#         logger.info(message)
+#         continue
+
+#     if not hours:
+#         message = f"No hours to process for {date_str}. Skipping."
+#         logger.info(message)
+#         continue
+
+#     input_files = []
+#     first_video_epoch = None
+
+#     for hour in hours:
+#         hour_path = os.path.join(base_path, hour)
+#         videos = sorted([v for v in os.listdir(hour_path) if v.endswith('.mp4')])
+
+#         for video in videos:
+#             video_path = os.path.join(hour_path, video)
+#             if is_valid_video(video_path):
+#                 if not first_video_epoch:
+#                     first_video_epoch = extract_epoch(video)
+#                 input_files.append(video_path)
+
+#     if not input_files:
+#         message = f"No valid videos found for {date_str}. Skipping."
+#         logger.info(message)
+#         continue
+
+#     # Create a temporary text file for ffmpeg input
+#     with open('input.txt', 'w') as f:
+#         for file in input_files:
+#             f.write(f"file '{file}'\n")
+
+#     # Define the output file
+#     output_file = os.path.join(base_path, f"{date_str}.mkv")
+
+#     # Run ffmpeg command to concatenate videos without re-encoding using ffmpeg-python
+#     try:
+#         # Run ffmpeg command to concatenate videos without re-encoding
+#         ffmpeg.input('input.txt', format='concat', safe=0).output(output_file, c='copy').run()
+#     except ffmpeg.Error as e:
+#         message = f"Failed to concatenate videos for {date_str}. Error: {e.stderr.decode()}"
+#         logger.error(message)
+#         continue
+
+#     # Remove the temporary text file
+#     os.remove('input.txt')
+
+#     # Set the creation and modification time of the output file to the first video's epoch time
+#     if first_video_epoch:
+#         os.utime(output_file, (first_video_epoch, first_video_epoch))
+
+#     # Delete original video files and folders
+#     try:
+#         for hour in hours:
+#             hour_path = os.path.join(base_path, hour)
+#             for video in os.listdir(hour_path):
+#                 os.remove(os.path.join(hour_path, video))
+#             os.rmdir(hour_path)
+#     except OSError as e:
+#         message = f"Failed to delete files or directories for {date_str}: {str(e)}"
+#         logger.error(message)
+#         continue
+
+#     message = f"Processed {date_str}, saved to {output_file}, set timestamps, and deleted original files."
+#     logger.info(message)
+    

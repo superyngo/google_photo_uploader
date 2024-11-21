@@ -6,7 +6,9 @@
     "words": [
         "boxlayout",
         "kivy",
-        "notime"
+        "mideo",
+        "notime",
+        "viewmodels"
     ],
     "ignoreWords": [],
     "import": []

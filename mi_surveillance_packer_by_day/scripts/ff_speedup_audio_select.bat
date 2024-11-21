@@ -1,10 +1,8 @@
 @echo off
 
-
 REM Set the interval 
 set "speed=100"
 set "postfix=speedup_select"
-
 
 REM Precompute FFmpeg expressions
 set "frame_select_expr='not(mod(n,%speed%))'"
