@@ -1,0 +1,26 @@
+2024-11-21 10:11:59 - root - INFO - 123
+2024-11-21 10:12:22 - root - INFO - 123
+2024-11-21 10:13:12 - root - WARNING - This is a warning message
+2024-11-21 10:14:45 - root - ERROR - This is an error message
+2024-11-21 10:14:51 - root - CRITICAL - This is a critical message
+2024-11-21 10:18:51 - INFO - 123
+2024-11-21 11:08:59 - INFO - Kivy application started
+2024-11-21 11:09:02 - INFO - Button was clicked!
+2024-11-21 11:09:03 - INFO - Button was clicked!
+2024-11-21 11:09:04 - INFO - Button was clicked!
+2024-11-21 11:09:04 - INFO - Button was clicked!
+2024-11-21 11:09:04 - INFO - Button was clicked!
+2024-11-21 11:09:05 - INFO - Button was clicked!
+2024-11-21 11:09:08 - INFO - Button was clicked!
+2024-11-21 11:09:09 - INFO - Button was clicked!
+2024-11-21 11:09:10 - INFO - Button was clicked!
+2024-11-21 11:09:10 - INFO - Button was clicked!
+2024-11-21 11:09:11 - INFO - Button was clicked!
+2024-11-21 11:09:11 - INFO - Button was clicked!
+2024-11-21 11:09:11 - INFO - Button was clicked!
+2024-11-21 11:09:12 - INFO - Button was clicked!
+2024-11-21 11:09:17 - INFO - Button was clicked!
+2024-11-21 11:09:18 - INFO - Button was clicked!
+2024-11-21 11:09:18 - INFO - Button was clicked!
+2024-11-21 11:09:18 - INFO - Button was clicked!
+2024-11-21 11:53:16 - ERROR - e

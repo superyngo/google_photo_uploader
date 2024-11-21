@@ -1,39 +1,37 @@
 import logging
 import logging.config
-from datetime import datetime
 import os
+from datetime import datetime
+import configparser
 
-# Ensure the log directory exists
-log_dir = "./log"
-os.makedirs(log_dir, exist_ok=True)
+def setup_logger():
+    # Load the configuration file
+    config = configparser.ConfigParser()
+    config.read('./app/config/logger.conf')
 
-logging_config: str = r"./app/config/logging.conf"
-dynamic_logging_config: str = r"./app/config/logging_dynamic.conf"
+    # Get the current date for the log filename
+    datestamp = datetime.now().strftime('%Y-%m-%d')
+    log_filename = f'./log/{datestamp}.log'
 
-# Determine today's log filename
-today_date = datetime.now().strftime("%Y-%m-%d")
-log_file = os.path.join(log_dir, f"{today_date}.log")
+    # Ensure the log directory exists
+    os.makedirs('./log', exist_ok=True)
 
-# Update the logging configuration dynamically
-def update_logging_conf():
-    with open(logging_config, "r") as f:
-        config = f.read()
+    # Update the file handler's filename in the configuration
+    config.set('handler_fileHandler', 'args', f"('{log_filename}', 'a')")
 
-    # Replace the placeholder with the actual log file
-    updated_config = config.replace('./log/default.log', log_file)
-    with open(dynamic_logging_config, "w") as f:
-        f.write(updated_config)
+    # Apply the logging configuration
+    logging.config.fileConfig(config)
 
-update_logging_conf()
+    # Return the root logger
+    return logging.getLogger()
 
-# Load the updated logging configuration
-logging.config.fileConfig(dynamic_logging_config)
-
-# Custom logger function
-def logger(message):
-    log = logging.getLogger()
-    log.info(message)
+# Initialize the logger
+logger = setup_logger()
 
 # Example usage
 if __name__ == "__main__":
-    logger("This is an info message.")
+    # logger.debug('This is a debug message')
+    logger.info('This is an info message')
+    logger.warning('This is a warning message')
+    logger.error('This is an error message')
+    logger.critical('This is a critical message')
