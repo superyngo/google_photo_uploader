@@ -1,9 +1,7 @@
 from app.viewmodels.mideo_converter import *
-from app.config.config import handle_speedup
+from app.config.config import handle_speedup, base_path
 
 def main() -> None:
-
-    base_path: LiteralString = os.path.join('H:', 'data', '94f827b4b94e')
 
     video_files: list[str] = list_video_files(base_path)
 
