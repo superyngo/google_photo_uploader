@@ -3,6 +3,7 @@ ffmpeg -i 20241117_cut.mp4 -vf "setpts=0.01*PTS" -af "atempo=100" output.mkv
 ffmpeg -i input.mkv -filter_complex "[0:v]setpts=0.5*PTS[v];[0:a]atempo=2[a]" -map "[v]" -map "[a]" output.mkv
 ffmpeg -i 20241117_cut.mp4 -vf "setpts='if(gte(mod(N,2382),40),0.01*PTS,PTS)'" -an output.mkv
 ffmpeg -i 20241117_cut.mkv -filter:v "setpts=PTS/60" output.mkv
+ffmpeg -i "%~1" -vf "select='not(mod(n,%speed%))',setpts=N/FRAME_RATE/TB" -af "aselect='not(mod(n,%speed%))',asetpts=N/SR/TB" -shortest -vsync vfr "%~n1_%postfix%.mkv"
 
 @REM cut
 ffmpeg -i input.mkv -ss 00:00:33 -to 00:01:00 -c:v copy -c:a copy output.mkv

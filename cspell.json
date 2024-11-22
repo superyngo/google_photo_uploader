@@ -4,11 +4,14 @@
     "dictionaryDefinitions": [],
     "dictionaries": [],
     "words": [
+        "aselect",
         "boxlayout",
         "kivy",
         "mideo",
         "notime",
-        "viewmodels"
+        "setpts",
+        "viewmodels",
+        "vsync"
     ],
     "ignoreWords": [],
     "import": []
