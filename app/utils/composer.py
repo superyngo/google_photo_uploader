@@ -1,7 +1,7 @@
 from app.utils.common import fn_log
 from app.utils.multithreading import multithreading
 from types import MethodType
-from typing import Optional, Any, Protocol, Dict, Callable
+from typing import Optional, Any, Protocol, Callable
 
 class CsLoaderComponent:
     def __init__(self, *args, loadable_components: dict):
