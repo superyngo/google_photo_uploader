@@ -1,18 +1,13 @@
-from app.viewmodels.mideo_converter import *
 from app.config.config import handle_speedup, base_path
+from app.viewmodels.mideo_converter import *
 
 def main() -> None:
 
     video_files: list[str] = list_video_files(base_path)
 
-    if handle_speedup['value']:
-        video_files_speedup: list[str] = mark_speedup(video_files)
-        for video_path in video_files_speedup:
-            do_speedup: int = speedup_videos(video_path, 100)
-
     grouped_videos: GroupedVideos = group_files_by_date(video_files, 5)
     
-    do_merge: int = merge_videos(grouped_videos, base_path)
+    do_merge: int = merge_videos(grouped_videos, base_path, handle_speedup)
 
 
 if __name__ == '__main__':

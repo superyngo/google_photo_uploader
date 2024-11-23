@@ -4,13 +4,18 @@
     "dictionaryDefinitions": [],
     "dictionaries": [],
     "words": [
+        "acodec",
         "aselect",
+        "asetpts",
         "boxlayout",
         "ffprobe",
         "kivy",
         "mideo",
         "notime",
+        "othertags",
+        "Seedupkwargs",
         "setpts",
+        "vcodec",
         "viewmodels",
         "vsync"
     ],

@@ -1,51 +1,62 @@
 import ffmpeg
 from app.utils.logger import logger
-import os
+from typing import TypedDict, NotRequired
 
-def speedup(input_file: str, speed: int) -> int:
-    # Get the directory, base name, and extension of the input file
-    directory: str
-    original_filename: str
-    base_name: str
-    extension: str
-    temp_input_file: str
-    directory, original_filename = os.path.split(input_file)
-    base_name, extension = os.path.splitext(original_filename)
+class EncodeKwargs(TypedDict):
+    video_track_timescale:NotRequired[int]
+    vcodec: NotRequired[str]
+    video_bitrate: NotRequired[int]
+    acodec: NotRequired[str]
+    ar: NotRequired[int]
+    f: NotRequired[str]
+
+def probe_encoding_info(file_path: str) -> EncodeKwargs:
+    # Probe the video file to get metadata
+    probe = ffmpeg.probe(file_path)
     
-    # Define the temporary input file name
-    temp_input_file = os.path.join(directory, f"{base_name}_temp{extension}")
+    # Initialize the dictionary with default values
+    encoding_info: EncodeKwargs = {}
     
-    # Rename the original input file to the temporary input file
-    os.rename(input_file, temp_input_file)
+    # Extract video stream information
+    video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+    if video_stream:
+        encoding_info['video_track_timescale'] = int(video_stream.get('time_base').split('/')[1])
+        encoding_info['vcodec'] = video_stream.get('codec_name')
+        encoding_info['video_bitrate'] = int(video_stream.get('bit_rate', 0))
+
+    # Extract audio stream information
+    audio_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'audio'), None)
+    if audio_stream:
+        encoding_info['acodec'] = audio_stream.get('codec_name')
+        encoding_info['ar'] = int(audio_stream.get('sample_rate', 0))
+
+    # Extract format information
+    format_info = probe.get('format', {})
+    encoding_info['f'] = format_info.get('format_name').split(',')[0]
+    cleaned_None: EncodeKwargs = {k: v for k, v in encoding_info.items() if v is not None or v != 0}
     
-    # Define the output file name
-    output_file = os.path.join(directory, f"{base_name}_output{extension}")
-    
+    return cleaned_None
+
+def speedup(input_file: str, output_file:str, speed: int, **othertags) -> int:
     try:
         # Speedup the video using ffmpeg-python
         (
             ffmpeg
-            .input(temp_input_file)
+            .input(input_file)
             .output(
                 output_file,
                 vf=f"select='not(mod(n,{speed}))',setpts=N/FRAME_RATE/TB",
                 af=f"aselect='not(mod(n,{speed}))',asetpts=N/SR/TB",
-                shortest=True,
-                vsync='vfr'
+                map=0,
+                shortest=None,
+                fps_mode='vfr',
+                **othertags
             )
             .run()
         )
-        
-        # Rename the output file back to the original file name
-        os.rename(output_file, input_file)
     except ffmpeg.Error as e:
-            logger.error(f"Failed to speedup videos for {input_file}. Error: {e.stderr.decode()}")
+            logger.error(f"Failed to speedup videos for {input_file}. Error: {e.stderr}")
             raise e
-    finally:
-        # Remove the temporary input file
-        if os.path.exists(temp_input_file):
-            os.remove(temp_input_file)
-
     return 0
 
 def merge(input_txt: str, output_file:str) -> int:
@@ -70,6 +81,22 @@ def is_valid(file_path: str) -> bool:
         logger.info(message)
         return False
 
-
+def re_encode(input_file: str, output_file:str, **othertags:EncodeKwargs) -> int:
+    try:
+        # Re encode the video using ffmpeg-python
+        (
+            ffmpeg
+            .input(input_file)
+            .output(
+                output_file,
+                map=0,
+                **othertags
+            )
+            .run()
+        )
+    except ffmpeg.Error as e:
+            logger.error(f"Failed to re encode videos for {input_file}. Error: {e.stderr}")
+            raise e
+    return 0
 
 

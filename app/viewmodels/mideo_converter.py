@@ -1,15 +1,14 @@
 import os
 from datetime import datetime, timedelta
-from typing import LiteralString, TypedDict, NotRequired
+from typing import LiteralString, TypedDict, NotRequired, Callable
 from app.utils.logger import logger
 from app.services import ffmpeg_converter
 from ffmpeg import Error as ffmpeg_Error
 
 type GroupedVideos = dict[str, dict[int,str]]
 class HandleSpeedup(TypedDict):
-    value: bool
-    start_hour: NotRequired[int]
-    end_hour: NotRequired[int]
+    start_hour: int
+    end_hour: int
 
 def extract_epoch(filename: str) -> int|None:
     """Function to extract epoch time from filename
@@ -33,7 +32,7 @@ def list_video_files(root_path: str, valid_extensions: set[str]|None=None) -> li
     
     return video_files
 
-def mark_speedup(video_files: list[str], start_hour: int=0, end_hour: int=0) -> list[str]:
+# def mark_speedup(video_files: list[str], start_hour: int=0, end_hour: int=0) -> list[str]:
     video_files_speedup: list[str] = []
     speedup_range: list[int]|range
     # Create the speedup range, handling wrap-around at midnight
@@ -47,6 +46,7 @@ def mark_speedup(video_files: list[str], start_hour: int=0, end_hour: int=0) -> 
         epoch_time: int | None = extract_epoch(filename)
         
         if epoch_time is None:
+            logger.info(f"{filename} has no epoch time.")
             continue
         
         file_hour: int = datetime.fromtimestamp(epoch_time).hour
@@ -78,9 +78,48 @@ def group_files_by_date(video_files: list[str], start_hour: int=0) -> GroupedVid
 
     return grouped_files
 
-def merge_videos(video_dict: GroupedVideos, base_path: str) -> int:
+def get_speedup_range(start_hour: int, end_hour:int) -> range|list[int]:
+    # Create the speedup range, handling wrap-around at midnight
+    if end_hour >= start_hour:
+        return range(start_hour, end_hour + 1)
+    else:
+        return list(range(start_hour, 25)) + list(range(0,  end_hour + 1))
+
+def covert_replace(ff_func: Callable, input_file: str, **kwargs) -> int:
+    # Get the directory, base name, and extension of the input file
+    directory: str
+    original_filename: str
+    base_name: str
+    extension: str
+    temp_input_file: str
+    directory, original_filename = os.path.split(input_file)
+    base_name, extension = os.path.splitext(original_filename)
+    
+    # Define the temporary input file name
+    temp_input_file = os.path.join(directory, f"{base_name}_temp{extension}")
+    
+    # Rename the original input file to the temporary input file
+    os.rename(input_file, temp_input_file)
+    
+    # Define the output file name
+    output_file: str = os.path.join(directory, f"{base_name}_output{extension}")
+    
+    try:
+        ff_func(input_file, output_file, **kwargs)
+            
+        # Rename the output file back to the original file name
+        os.rename(output_file, input_file)
+    finally:
+    # Remove the temporary input file
+        if os.path.exists(temp_input_file):
+            os.remove(temp_input_file)
+
+def merge_videos(video_dict: GroupedVideos, base_path: str, handle_speedup: HandleSpeedup|None=None) -> int:
     today: str = datetime.now().strftime('%Y%m%d')
     dir_to_delete: set = set()
+    speedup_range: list[int]|range =[]
+    if handle_speedup is not None:
+        speedup_range = get_speedup_range(**handle_speedup)
     
     for date_str, videos in video_dict.items():
         dir_to_delete.clear()
@@ -95,6 +134,7 @@ def merge_videos(video_dict: GroupedVideos, base_path: str) -> int:
         # Prepare the input file list for ffmpeg
         input_files: list[str] = []
         for epoch_time, video_path in sorted_videos.items():
+            file_hour: int = datetime.fromtimestamp(epoch_time).hour
             if ffmpeg_converter.is_valid(video_path):
                 input_files.append(video_path)
                 dir_to_delete.add(os.path.dirname(video_path))
@@ -134,8 +174,28 @@ def merge_videos(video_dict: GroupedVideos, base_path: str) -> int:
         except OSError as e:
             logger.error(f"Failed to delete files or directories for {date_str}: {str(e)}")
             return 2
-    
+
         logger.info(f"Processed {date_str}, saved to {output_file}, set timestamps, and deleted original files.")
+
+        # Speedup if needed
+        if handle_speedup is not None:
+            directory: str
+            original_filename: str
+            base_name: str
+            extension: str
+            directory, original_filename = os.path.split(output_file)
+            base_name, extension = os.path.splitext(original_filename)
+            
+            # Define the speedup output file path
+            speedup_output_dir: str = os.path.join(directory, 'speedup')
+            os.makedirs(speedup_output_dir, exist_ok=True)
+            speedup_output_file: str = os.path.join(speedup_output_dir, f"{base_name}_speedup{extension}")
+            encode_info: ffmpeg_converter.EncodeKwargs = {'video_track_timescale': 90000, 'vcodec': 'hevc', 'video_bitrate': 920811, 'acodec': 'pcm_alaw', 'ar': 16000, 'f': 'mov'}
+            do_speedup: int = ffmpeg_converter.speedup(output_file, speedup_output_file, 100, **encode_info)
+            
+            # Set the file's timestamp to the first video's epoch time
+            os.utime(speedup_output_file, (first_video_epoch, first_video_epoch))
+            logger.info(f"Sped up {output_file} to {speedup_output_file} with same timestamps")
     
     return 0
 
@@ -146,14 +206,10 @@ def main() -> None:
 
     video_files: list[str] = list_video_files(base_path)
 
-    if handle_speedup['value']:
-        video_files_speedup: list[str] = mark_speedup(video_files)
-        for video_path in video_files_speedup:
-            do_speedup: int = ffmpeg_converter.speedup(video_path, 100)
-
     grouped_videos: GroupedVideos = group_files_by_date(video_files, 5)
     
-    do_merge: int = merge_videos(grouped_videos, base_path)
+    do_merge: int = merge_videos(grouped_videos, base_path, handle_speedup)
 
 if __name__ == '__main__':
     main()
+

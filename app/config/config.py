@@ -9,5 +9,5 @@ os.environ['HTTPS_PROXY'] = ''
 os.environ['HTTP_PROXY'] = ''
 
 
-handle_speedup: HandleSpeedup = {'value': True, 'start_hour': 23, 'end_hour': 5}
+handle_speedup: HandleSpeedup = {'start_hour': 23, 'end_hour': 5}
 base_path: LiteralString = os.path.join('H:', 'data', '94f827b4b94e')

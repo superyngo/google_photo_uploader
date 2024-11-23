@@ -1,2 +1,2 @@
 from .db_manager import DatabaseManager
-import ffmpeg_converter
+from . import ffmpeg_converter
