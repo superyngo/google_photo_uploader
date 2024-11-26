@@ -30,6 +30,7 @@ ffprobe -i 1732143515.mp4
 @REM set fps
 ffmpeg -i 20241117_cut.mp4 -filter:v "fps=20" -c:v libx264  -preset fast -crf 23 -c:a copy output.mp4
 
-ffmpeg -i 1.mp4 -video_track_timescale 90000 -map 0 -c:v hevc -tag:v 0x31637668 -b:v 921k -c:a pcm_alaw -ar 16000 -f mov -f mov output.mp4
+ffmpeg -i 1.mp4 -map 0 -c:v hevc -b:v 920k -c:a pcm_alaw -ar 16000 -b:a 128k -f mov -f mov output.mp4
+ffmpeg -i 1.mp4 -video_track_timescale 90000 -map 0 -c:v hevc -crf 30 -c:a pcm_alaw -ar 16000 -b:a 128k -f mov -f mov output.mp4
 
 

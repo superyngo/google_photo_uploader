@@ -5,9 +5,15 @@ from datetime import datetime
 import configparser
 
 def setup_logger():
+    config_path = './app/config/logger.conf'
+    
+    # Check if the configuration file exists
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Configuration file '{config_path}' does not exist.")
+    
     # Load the configuration file
     config = configparser.ConfigParser()
-    config.read('./app/config/logger.conf')
+    config.read(config_path)
 
     # Get the current date for the log filename
     datestamp = datetime.now().strftime('%Y-%m-%d')
@@ -24,6 +30,7 @@ def setup_logger():
 
     # Return the root logger
     return logging.getLogger()
+
 
 # Initialize the logger
 logger = setup_logger()

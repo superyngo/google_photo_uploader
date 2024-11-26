@@ -17,7 +17,8 @@
         "setpts",
         "vcodec",
         "viewmodels",
-        "vsync"
+        "vsync",
+        "datestamp"
     ],
     "ignoreWords": [],
     "import": []
