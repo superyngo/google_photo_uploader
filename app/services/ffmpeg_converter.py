@@ -1,5 +1,5 @@
 import ffmpeg
-from app.utils.logger import logger
+from app.utils.logger.logger import logger
 from typing import TypedDict, NotRequired
 
 class EncodeKwargs(TypedDict):

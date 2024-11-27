@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
 from typing import LiteralString, TypedDict, NotRequired, Callable
-from app.utils.logger import logger
+from app.utils.logger.logger import logger
 from app.services import ffmpeg_converter
 from ffmpeg import Error as ffmpeg_Error
 

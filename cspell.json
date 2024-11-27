@@ -8,7 +8,9 @@
         "aselect",
         "asetpts",
         "boxlayout",
+        "datestamp",
         "ffprobe",
+        "filechooser",
         "kivy",
         "mideo",
         "notime",
@@ -17,8 +19,7 @@
         "setpts",
         "vcodec",
         "viewmodels",
-        "vsync",
-        "datestamp"
+        "vsync"
     ],
     "ignoreWords": [],
     "import": []

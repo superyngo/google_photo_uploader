@@ -1,11 +1,16 @@
 import logging
-import logging.config
+from logging import config as LoggerConfig, Logger
 import os
 from datetime import datetime
 import configparser
+from pathlib import Path
 
-def setup_logger():
-    config_path = './app/config/logger.conf'
+def setup_logger() -> Logger:
+    # Determine the path to the logger module
+    module_path: Path = Path(__file__).parent
+
+    # Construct the path to the configuration file within the package's config folder
+    config_path: Path = module_path / 'config' / 'logger.conf'
     
     # Check if the configuration file exists
     if not os.path.exists(config_path):
@@ -16,8 +21,8 @@ def setup_logger():
     config.read(config_path)
 
     # Get the current date for the log filename
-    datestamp = datetime.now().strftime('%Y-%m-%d')
-    log_filename = f'./log/{datestamp}.log'
+    datestamp: str = datetime.now().strftime('%Y-%m-%d')
+    log_filename: str = f'./log/{datestamp}.log'
 
     # Ensure the log directory exists
     os.makedirs('./log', exist_ok=True)
@@ -26,14 +31,14 @@ def setup_logger():
     config.set('handler_fileHandler', 'args', f"('{log_filename}', 'a')")
 
     # Apply the logging configuration
-    logging.config.fileConfig(config)
+    LoggerConfig.fileConfig(config)
 
     # Return the root logger
     return logging.getLogger()
 
 
 # Initialize the logger
-logger = setup_logger()
+logger: Logger = setup_logger()
 
 # Example usage
 if __name__ == "__main__":
