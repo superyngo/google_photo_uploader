@@ -20,15 +20,16 @@ def setup_logger() -> Logger:
     config = configparser.ConfigParser()
     config.read(config_path)
 
+    # Ensure the log directory exists in the executing root
+    log_directory: Path = Path.cwd() / 'log'
+    log_directory.mkdir(parents=True, exist_ok=True)
+    
     # Get the current date for the log filename
     datestamp: str = datetime.now().strftime('%Y-%m-%d')
-    log_filename: str = f'./log/{datestamp}.log'
-
-    # Ensure the log directory exists
-    os.makedirs('./log', exist_ok=True)
-
+    log_filename: Path = log_directory / f"{datestamp}.log"
+    
     # Update the file handler's filename in the configuration
-    config.set('handler_fileHandler', 'args', f"('{log_filename}', 'a')")
+    config.set('handler_fileHandler', 'args', f"(r'{log_filename}', 'a')")
 
     # Apply the logging configuration
     LoggerConfig.fileConfig(config)

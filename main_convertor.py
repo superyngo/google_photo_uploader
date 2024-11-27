@@ -1,4 +1,4 @@
-from app.config.config import handle_speedup, base_path
+import app.config.config 
 from app.viewmodels.mideo_converter import *
 
 def main() -> None:

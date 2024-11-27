@@ -1,26 +1,7 @@
 import hashlib
 import re, os
-from app.utils.timestamp import *
 import datetime
 
-# URL and Path
-STR_DOWNLOADS_FOLDER_PATH = os.path.join(os.path.expanduser('~'), 'Downloads')
-STR_DOWNLOADS_TIMESTAMP_FOLDER_PATH = f"{STR_DOWNLOADS_FOLDER_PATH}\\{STR_DATESTAMP}"
-
-def fn_log(str_log:str, str_filename:str = "") -> None:
-    # Get the current date and time
-    current_time = datetime.datetime.now()
-    # Format the timestamp as a readable string
-    timestamp = current_time.strftime("%Y-%m-%d %H:%M:%S")
-    # Define the log message with the timestamp
-    log_message = f"{timestamp} - {str_log}\n"
-    # Open the log file in append mode ('a')
-    if str_filename == "":
-        str_filename = f"{STR_DATESTAMP}_log.txt"
-    with open(f"{STR_DOWNLOADS_TIMESTAMP_FOLDER_PATH}\\{str_filename}", 'a') as log_file:
-        # Write the log message to the file
-        log_file.write(log_message)
-    print(log_message)
 
 def sanitize_string(value):
     # Remove non-printable and non-ASCII characters, except for common Chinese characters and punctuation

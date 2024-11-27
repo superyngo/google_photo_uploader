@@ -13,6 +13,7 @@
         "filechooser",
         "kivy",
         "mideo",
+        "nodriver",
         "notime",
         "othertags",
         "Seedupkwargs",

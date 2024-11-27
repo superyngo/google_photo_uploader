@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 from queue import Empty as QueueEmpty
 from typing import Any, Callable, Optional
-from app.utils.common import fn_log 
+from .logger import logger 
 
 
 LOCK = threading.Lock()
@@ -53,8 +53,8 @@ def worker(queue: Queue, call_def: Callable, args: tuple[Any], kwargs: dict, ind
     while not queue.empty():
         try:
             # item = queue.get_nowait()  # Non-blocking get
-            # fn_log(f"{index}: Remaining items: {queue.qsize()}")
-            # fn_log(f"{index}: Processing item: {item}")
+            # logger.info(f"{index}: Remaining items: {queue.qsize()}")
+            # logger.info(f"{index}: Processing item: {item}")
 
             item = queue.get()  # Blocking get
 
@@ -67,10 +67,10 @@ def worker(queue: Queue, call_def: Callable, args: tuple[Any], kwargs: dict, ind
             # Execute the provided function
             call_def(*args, **kwargs)
             queue.task_done()  # Ensure this item is marked as done
-            fn_log(f"{index}: Remaining items: {queue.qsize()}")
-            fn_log(f"{index}: Processing item: {item}")
+            logger.info(f"{index}: Remaining items: {queue.qsize()}")
+            logger.info(f"{index}: Processing item: {item}")
         except QueueEmpty:
-            fn_log("{index}: No remaining items.")
+            logger.info("{index}: No remaining items.")
             break  # Exit if the queue is empty
 
 def multithreading(call_def:Callable, source:Any=None, threads:int=1, args:Optional[tuple[Any]]=None, kwargs:Optional[dict]=None):

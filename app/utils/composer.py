@@ -1,5 +1,5 @@
-from app.utils.common import fn_log
-from app.utils.multithreading import multithreading
+from . import logger
+from .multithreading import multithreading
 from types import MethodType
 from typing import Optional, Any, Protocol, Callable
 

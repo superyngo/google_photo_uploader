@@ -1,6 +1,6 @@
 # 20241014
-from app.utils.multithreading import *
-from app.utils.common import *
+from .multithreading import *
+from .common import *
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
