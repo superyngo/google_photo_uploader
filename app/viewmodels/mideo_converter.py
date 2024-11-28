@@ -2,8 +2,8 @@ import os
 from datetime import datetime, timedelta
 from typing import LiteralString, TypedDict, NotRequired, Callable
 from app.utils.logger.logger import logger
-from app.services import ffmpeg_converter
-from ffmpeg import Error as ffmpeg_Error
+# from app.services.ffmpeg_converter import probe_encoding_info 
+# from app.services.ffmpeg_converter import probe_encoding_info 
 
 type GroupedVideos = dict[str, dict[int,str]]
 class HandleSpeedup(TypedDict):
