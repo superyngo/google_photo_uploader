@@ -2,8 +2,8 @@
 # driver, userprofile
 import asyncio
 import nodriver as uc
-from .logger import logger
-from app.config.config import *
+from . import logger
+from app import *
 async def main():
     browser = await uc.start()
     page = await browser.get('https://www.nowsecure.nl')

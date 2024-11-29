@@ -1,6 +1,6 @@
 import ffmpeg
 from ffmpeg import Error as ffmpeg_Error
-from app.utils.logger import logger
+from ..utils import logger
 from typing import TypedDict, NotRequired
 
 class EncodeKwargs(TypedDict):

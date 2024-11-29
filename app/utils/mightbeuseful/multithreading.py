@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 from queue import Empty as QueueEmpty
 from typing import Any, Callable, Optional
-from app.utils.logger import logger 
+from ...utils.logger_module import logger 
 
 
 LOCK = threading.Lock()

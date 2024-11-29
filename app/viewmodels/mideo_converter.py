@@ -1,9 +1,8 @@
 import os
 from datetime import datetime, timedelta
-from typing import LiteralString, TypedDict, NotRequired, Callable
-from app.utils.logger.logger import logger
-# from app.services.ffmpeg_converter import probe_encoding_info 
-# from app.services.ffmpeg_converter import probe_encoding_info 
+from typing import LiteralString, TypedDict, Callable
+from ..utils import logger
+from ..services import ffmpeg_converter
 
 type GroupedVideos = dict[str, dict[int,str]]
 class HandleSpeedup(TypedDict):
@@ -32,30 +31,6 @@ def list_video_files(root_path: str, valid_extensions: set[str]|None=None) -> li
     
     return video_files
 
-# def mark_speedup(video_files: list[str], start_hour: int=0, end_hour: int=0) -> list[str]:
-    video_files_speedup: list[str] = []
-    speedup_range: list[int]|range
-    # Create the speedup range, handling wrap-around at midnight
-    if end_hour >= start_hour:
-        speedup_range = range(start_hour, end_hour + 1)
-    else:
-        speedup_range = list(range(end_hour, 25)) + list(range(0, start_hour + 1))
-
-    for video_path in video_files:
-        filename: str = os.path.basename(video_path)
-        epoch_time: int | None = extract_epoch(filename)
-        
-        if epoch_time is None:
-            logger.info(f"{filename} has no epoch time.")
-            continue
-        
-        file_hour: int = datetime.fromtimestamp(epoch_time).hour
-        
-        if file_hour in speedup_range: 
-            video_files_speedup.append(video_path)
-
-    return video_files_speedup
-
 def group_files_by_date(video_files: list[str], start_hour: int=0) -> GroupedVideos:
     grouped_files: GroupedVideos = {}
 
@@ -70,7 +45,7 @@ def group_files_by_date(video_files: list[str], start_hour: int=0) -> GroupedVid
             file_datetime: datetime = datetime.fromtimestamp(epoch_time)
             if file_datetime.hour < start_hour:
                 file_datetime -= timedelta(days=1)
-            date_key: str = file_datetime.strftime('%Y%m%d')
+            date_key = file_datetime.strftime('%Y%m%d')
 
         if date_key not in grouped_files:
             grouped_files[date_key] = {}
@@ -109,6 +84,7 @@ def covert_replace(ff_func: Callable, input_file: str, **kwargs) -> int:
             
         # Rename the output file back to the original file name
         os.rename(output_file, input_file)
+        return 0
     finally:
     # Remove the temporary input file
         if os.path.exists(temp_input_file):
@@ -117,7 +93,7 @@ def covert_replace(ff_func: Callable, input_file: str, **kwargs) -> int:
 def merge_videos(video_dict: GroupedVideos, base_path: str, handle_speedup: HandleSpeedup|None=None) -> int:
     today: str = datetime.now().strftime('%Y%m%d')
     dir_to_delete: set = set()
-    speedup_range: list[int]|range =[]
+    speedup_range: list[int]|range = []
     if handle_speedup is not None:
         speedup_range = get_speedup_range(**handle_speedup)
     
@@ -154,7 +130,7 @@ def merge_videos(video_dict: GroupedVideos, base_path: str, handle_speedup: Hand
         try:
             # Use ffmpeg to concatenate videos
             ffmpeg_converter.merge('input.txt', output_file)
-        except ffmpeg_Error as e:
+        except ffmpeg_converter.ffmpeg_Error as e:
             logger.error(f"Failed to concatenate videos for {date_str}. Error: {e.stderr.decode()}")
             return 1
         
@@ -200,7 +176,7 @@ def merge_videos(video_dict: GroupedVideos, base_path: str, handle_speedup: Hand
     return 0
 
 def main() -> None:
-    handle_speedup: HandleSpeedup = {'value': True, 'start_hour': 23, 'end_hour': 5}
+    handle_speedup: HandleSpeedup = {'start_hour': 23, 'end_hour': 5}
 
     base_path: LiteralString = os.path.join('H:', 'data', '94f827b4b94e')
 
