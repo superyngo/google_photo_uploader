@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, NotRequired
 from pathlib import Path
 class CsBasicComponent:
     def __getattr__(self, name):
@@ -17,21 +17,28 @@ class MyDataclass:
         raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
 class MideoMerger(TypedDict):
-    name: str
     folder: Path
     start_hour: int
     delete_after: bool
 
-class speedup(TypedDict):
-    name: str
+class Speedup(TypedDict):
     folder: Path
     multiple: int
+
+class GPuploadSubtask(TypedDict):
+    local_album: Path
+    GPhoto_url: str
 
 class GPhotoUploader(TypedDict):
     name: str
     profile: Path
-    local_album: Path
-    GPhoto_url: str
+    chrome_path: Path | None
+    subtasks:list[GPuploadSubtask]
+
+class ActionInstruct(TypedDict):
+    filename: str
+    selected: list[int] | None
+    tasks: list[MideoMerger|Speedup|GPhotoUploader]
 
 
 

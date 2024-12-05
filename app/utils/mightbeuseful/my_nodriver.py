@@ -2,7 +2,7 @@
 # driver, userprofile
 import asyncio
 import nodriver as uc
-from . import logger
+from .. import logger
 from app import *
 async def main():
     browser = await uc.start()

@@ -1,5 +1,7 @@
 import hashlib
 import re
+from pathlib import Path
+import json
 
 def sanitize_string(value):
     # Remove non-printable and non-ASCII characters, except for common Chinese characters and punctuation
@@ -29,3 +31,6 @@ def create_sha256_hash(data):
     # Get the hexadecimal representation of the hash
     return sha256_hash.hexdigest()
 
+def load_instruction(path: Path):
+    with open(path, 'r') as f:
+        return json.load(f)

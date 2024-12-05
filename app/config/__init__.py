@@ -1,3 +1,3 @@
-from .app_config import APP_NAME, CONFIG_PATH, APP_BASE_DIR, SESSIONS_DIR, HANDLE_SPEEDUP, BASE_PATH
+from . import app_config as config
 
-__all__: list[str] = ['APP_NAME', 'APP_BASE_DIR', 'CONFIG_PATH', 'SESSIONS_DIR', 'HANDLE_SPEEDUP', 'BASE_PATH']
+__all__: list[str] = ['config']
