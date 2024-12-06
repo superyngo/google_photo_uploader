@@ -153,7 +153,7 @@ def merge_videos(video_dict: GroupedVideos, base_path: str, handle_speedup: Hand
 
         logger.info(f"Processed {date_str}, saved to {output_file}, set timestamps, and deleted original files.")
 
-        # Speedup if needed
+        # SpeedupTask if needed
         if handle_speedup is not None:
             directory: str
             original_filename: str

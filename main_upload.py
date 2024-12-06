@@ -12,7 +12,7 @@ UCuploader = CsUCUploader()
 # task = None
 
 # while True:
-#     task = input(f"tasks:\n {'\n '.join(menu.keys())}\n")
+#     task = input(f"action:\n {'\n '.join(menu.keys())}\n")
 #     if input == 'quit':
 #         break
 #     menu[task]()

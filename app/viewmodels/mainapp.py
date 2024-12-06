@@ -35,7 +35,7 @@ class SessionManager:
             self.config = [{
                 "session_name": "anonymous",
                 "cookie": "",
-                "tasks": []
+                "action": []
             }]
             self.save_config()
         else:
@@ -74,7 +74,7 @@ class MainLayout(BoxLayout):
         self.session_box.add_widget(self.edit_button)
         self.add_widget(self.session_box)
         
-        # Tasks list
+        # action list
         self.tasks_box = BoxLayout(orientation='vertical')
         self.refresh_tasks()
         self.add_widget(self.tasks_box)
@@ -94,7 +94,7 @@ class MainLayout(BoxLayout):
             self.session_manager.config[0]
         )
         
-        for task in current_session['tasks']:
+        for task in current_session['action']:
             task_box = BoxLayout(orientation='horizontal', size_hint_y=None, height=40)
             
             # Local folder selection
@@ -142,7 +142,7 @@ class MainLayout(BoxLayout):
         new_session = {
             "session_name": f"Session_{len(self.session_manager.config)}",
             "cookie": "",
-            "tasks": []
+            "action": []
         }
         self.session_manager.config.append(new_session)
         self.session_manager.save_config()
@@ -189,7 +189,7 @@ class MainLayout(BoxLayout):
         current_session = next(
             s for s in self.session_manager.config if s['session_name'] == self.session_spinner.text
         )
-        current_session['tasks'].append({
+        current_session['action'].append({
             'local_album_folder': '',
             'google_photo_url': ''
         })

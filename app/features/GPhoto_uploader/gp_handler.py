@@ -3,18 +3,22 @@
 from pathlib import Path
 import asyncio
 import nodriver as uc
-from app.models.tasks import GPhotoUploader
 from ... import config
-from ...utils import load_instruction
-from ...models.tasks import ActionInstruct
-ACTION_NAME: str = config.ACTIONS['uploader']
-ACTION_INSTRUCTIONS_FILE: Path = config.CONFIG_PATH / (ACTION_NAME + '.json')
-ACTION_INSTRUCTIONS: ActionInstruct = load_instruction(ACTION_INSTRUCTIONS_FILE)
+from ...utils import load_assignment
+from ...models.tasks import UploaderInfo, UploaderSession
+ASSIGNMENT_NAME: str = config.ACTIONS['uploader']
+ASSIGNMENT_INFO_FILE: Path = config.CONFIG_PATH / (ASSIGNMENT_NAME + '.json')
+ASSIGNMENT_INFO: UploaderInfo = load_assignment(ASSIGNMENT_INFO_FILE)
 
-tasks = ACTION_INSTRUCTIONS['tasks']
+sessions: list[UploaderSession] = ASSIGNMENT_INFO['action']
 
-async def start_session(tasks: GPhotoUploader) -> int:
-    browser = await uc.start()
-    page = await browser.get('https://www.nowsecure.nl')
-    a = tasks['profile']
-    return 0
+async def start_session(session: UploaderSession) -> uc.Browser:
+    profile: Path = session['profile']
+    chrome_path: Path|None = session['chrome_path']    
+    browser = await uc.start(
+        user_data_dir='/path/to/existing/profile',  # by specifying it, it won't be automatically cleaned up when finished
+        browser_executable_path=chrome_path,
+    )
+
+    # page = await browser.get('https://www.nowsecure.nl')
+    return browser

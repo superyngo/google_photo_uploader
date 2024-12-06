@@ -16,30 +16,38 @@ class MyDataclass:
             raise AttributeError(f"'{name}' was not set during initialization")
         raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
-class MideoMerger(TypedDict):
+# MideoMergerTask
+class MideoMergerTask(TypedDict):
     folder: Path
     start_hour: int
     delete_after: bool
 
-class Speedup(TypedDict):
+# SpeedupTask
+class SpeedupTask(TypedDict):
     folder: Path
     multiple: int
 
-class GPuploadSubtask(TypedDict):
+# UploaderSession
+class UploaderTask(TypedDict):
     local_album: Path
     GPhoto_url: str
 
-class GPhotoUploader(TypedDict):
+class UploaderSession(TypedDict):
     name: str
     profile: Path
     chrome_path: Path | None
-    subtasks:list[GPuploadSubtask]
+    tasks:list[UploaderTask]
 
-class ActionInstruct(TypedDict):
+# Action
+class AssignmentInfo(TypedDict):
     filename: str
     selected: list[int] | None
-    tasks: list[MideoMerger|Speedup|GPhotoUploader]
 
+class UploaderInfo(AssignmentInfo):
+    action: list[UploaderSession]
 
+class SpeedupInfo(AssignmentInfo):
+    action: list[SpeedupTask]
 
-
+class MideoMergerInfo(AssignmentInfo):
+    action: list[MideoMergerTask]

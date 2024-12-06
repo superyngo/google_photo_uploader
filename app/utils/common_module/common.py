@@ -31,6 +31,6 @@ def create_sha256_hash(data):
     # Get the hexadecimal representation of the hash
     return sha256_hash.hexdigest()
 
-def load_instruction(path: Path):
+def load_assignment(path: Path):
     with open(path, 'r') as f:
         return json.load(f)
