@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from app.viewmodels.mideo_converter import HandleSpeedup
 from typing import LiteralString, TypedDict
 
 
@@ -11,15 +10,19 @@ os.environ["HTTP_PROXY"] = ""
 APP_NAME: LiteralString = "MideoToGPhoto"
 
 
-class _SystemPath(TypedDict):
-    APP_BASE: Path
-    CONFIG_PATH: Path
+class _AppPaths(TypedDict):
+    program_data: Path
+    app_data: Path
+    config: Path
+    logs: Path
 
 
 # set app base path
-SYSTEM_PATH: _SystemPath = {
-    "APP_BASE": Path.home() / "AppData" / "Roaming" / APP_NAME.lower(),
-    "CONFIG_PATH": APP_BASE_DIR / "config.conf",
+APP_PATHS: _AppPaths = {
+    "program_data": (program_data := Path(os.environ["APPDATA"]) / APP_NAME),
+    "config": program_data / "config.conf",
+    "app_data": (app_data := Path(os.environ["PROGRAMDATA"])),
+    "logs": app_data / APP_NAME / "Logs",
 }
 
 

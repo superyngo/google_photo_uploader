@@ -1,5 +1,4 @@
-from .logger_module import logger
+from .logger_module import setup_logger
 
 
-__all__: list[str] = ['logger']
-
+__all__: list[str] = ["setup_logger"]

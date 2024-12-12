@@ -14,6 +14,7 @@
         "kivy",
         "mideo",
         "mightbeuseful",
+        "Multiton",
         "nodriver",
         "notime",
         "othertags",
