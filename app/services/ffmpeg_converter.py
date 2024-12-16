@@ -60,7 +60,7 @@ def speedup(input_file: Path, output_file: Path, speed: int, **othertags) -> int
         (
             ffmpeg.input(input_file)
             .output(
-                temp_output_file,
+                str(temp_output_file),
                 vf=f"select='not(mod(n,{speed}))',setpts=N/FRAME_RATE/TB",
                 af=f"aselect='not(mod(n,{speed}))',asetpts=N/SR/TB",
                 map=0,
@@ -98,7 +98,7 @@ def jumpcut_speedup(
         (
             ffmpeg.input(input_file)
             .output(
-                temp_output_file,
+                str(temp_output_file),
                 vf=f"select='{frame_select_expr}',setpts=N/FRAME_RATE/TB",
                 af=f"aselect='{frame_select_expr}',asetpts=N/SR/TB",
                 map=0,
@@ -125,7 +125,7 @@ def convert(input_file: Path, output_file: Path, **othertags) -> int:
         (
             ffmpeg.input(input_file)
             .output(
-                temp_output_file,
+                str(temp_output_file),
                 **othertags,
             )
             .run()
@@ -141,11 +141,11 @@ def merge(input_txt: str, output_file: str | Path) -> int:
     try:
         # Use ffmpeg to concatenate videos
         ffmpeg.input(input_txt, format="concat", safe=0).output(
-            output_file, c="copy"
+            str(output_file), c="copy"
         ).run()
         return 0
     except ffmpeg.Error as e:
-        logger.error(f"Failed mergin {input_txt}. Error: {e.stderr.decode()}")
+        logger.error(f"Failed merging {input_txt}. Error: {e.stderr.decode()}")
         raise e
 
 

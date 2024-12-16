@@ -121,7 +121,7 @@ def merge_videos(video_dict: GroupedVideos, save_path: Path, delete_after: bool)
 
         # Define the output file path
         output_file: Path = save_path / f"{date_key}.mkv"
-
+        logger.info(f"{output_file = }")
         try:
             # Use ffmpeg to concatenate videos
             ffmpeg_converter.merge("input.txt", output_file)
@@ -139,6 +139,7 @@ def merge_videos(video_dict: GroupedVideos, save_path: Path, delete_after: bool)
         os.utime(output_file, (first_video_epoch, first_video_epoch))
 
         # Clean up original video files and directories
+        logger.info("Deleting source videos.")
         if delete_after:
             try:
                 for video_path in sorted_videos.values():
@@ -162,12 +163,16 @@ def merge_videos(video_dict: GroupedVideos, save_path: Path, delete_after: bool)
 def speedup_videos(
     input_folder: Path, multiple: int, output_folder_name: str = "speedup"
 ):
-    output_folder: Path = input_folder.parent / output_folder_name
+    output_folder: Path = input_folder / output_folder_name
+    logger.info(f"start speedup on {output_folder = }")
     output_folder.mkdir(parents=True, exist_ok=True)
-    mkv_video_files: list[Path] = list_video_files(input_folder, set(".mkv"), False)
+    mkv_video_files: list[Path] = list_video_files(input_folder, {".mkv"}, False)
     for video in mkv_video_files:
         output_file: Path = output_folder / (video.stem + "_speedup" + video.suffix)
         ffmpeg_converter.speedup(video, output_file, multiple)
+        logger.info(
+            f"Speeding up video saved to {output_file}, set timestamps as the original file."
+        )
     return 0
 
 
@@ -176,11 +181,14 @@ def merger_handler(
     start_hour: int = 6,
     delete_after: bool = True,
 ) -> int:
+    logger.info(f"Start merging videos in {folder_path}")
+    
     video_files: list[Path] = list_video_files(folder_path)
 
     grouped_videos: GroupedVideos = group_files_by_date(video_files, start_hour)
 
     do_merge: int = merge_videos(grouped_videos, folder_path, delete_after)
+    
     return do_merge
 
 
@@ -188,8 +196,10 @@ def speedup_handler(
     folder_path: Path,
     multiple: int = 50,
 ) -> int:
-
+    logger.info(f"Start speeding up videos in {folder_path}")
+    
     do_speedup: int = speedup_videos(folder_path, multiple)
+    
     return do_speedup
 
 

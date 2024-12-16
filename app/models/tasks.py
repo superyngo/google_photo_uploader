@@ -27,14 +27,14 @@ class MyDataclass:
 
 # MideoMergerTask
 class MideoMergerTask(TypedDict):
-    folder: Path
+    folder_path: Path
     start_hour: int
     delete_after: bool
 
 
 # SpeedupTask
 class SpeedupTask(TypedDict):
-    folder: Path
+    folder_path: Path
     multiple: int
 
 
