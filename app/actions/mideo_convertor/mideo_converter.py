@@ -91,6 +91,16 @@ def group_files_by_date(video_files: list[Path], start_hour: int = 0) -> Grouped
 
 
 def merge_videos(video_dict: GroupedVideos, save_path: Path, delete_after: bool) -> int:
+    """_summary_
+
+    Args:
+        video_dict (GroupedVideos): _description_
+        save_path (Path): _description_
+        delete_after (bool): _description_
+
+    Returns:
+        int: _description_
+    """
     today: date = datetime.today().date()
     dir_to_delete: set[Path] = set()
 
@@ -163,13 +173,25 @@ def merge_videos(video_dict: GroupedVideos, save_path: Path, delete_after: bool)
 def speedup_videos(
     input_folder: Path, multiple: int, output_folder_name: str = "speedup"
 ):
+    """_summary_
+
+    Args:
+        input_folder (Path): _description_
+        multiple (int): _description_
+        output_folder_name (str, optional): _description_. Defaults to "speedup".
+
+    Returns:
+        _type_: _description_
+    """
     output_folder: Path = input_folder / output_folder_name
-    logger.info(f"start speedup on {output_folder = }")
     output_folder.mkdir(parents=True, exist_ok=True)
     mkv_video_files: list[Path] = list_video_files(input_folder, {".mkv"}, False)
     for video in mkv_video_files:
+        original_encode: ffmpeg_converter.EncodeKwargs = (
+            ffmpeg_converter.probe_encoding_info(video)
+        )
         output_file: Path = output_folder / (video.stem + "_speedup" + video.suffix)
-        ffmpeg_converter.speedup(video, output_file, multiple)
+        ffmpeg_converter.speedup(video, output_file, multiple, **original_encode)
         logger.info(
             f"Speeding up video saved to {output_file}, set timestamps as the original file."
         )
@@ -181,14 +203,24 @@ def merger_handler(
     start_hour: int = 6,
     delete_after: bool = True,
 ) -> int:
+    """_summary_
+
+    Args:
+        folder_path (Path): _description_
+        start_hour (int, optional): _description_. Defaults to 6.
+        delete_after (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        int: _description_
+    """
     logger.info(f"Start merging videos in {folder_path}")
-    
+
     video_files: list[Path] = list_video_files(folder_path)
 
     grouped_videos: GroupedVideos = group_files_by_date(video_files, start_hour)
 
     do_merge: int = merge_videos(grouped_videos, folder_path, delete_after)
-    
+
     return do_merge
 
 
@@ -196,14 +228,24 @@ def speedup_handler(
     folder_path: Path,
     multiple: int = 50,
 ) -> int:
+    """_summary_
+
+    Args:
+        folder_path (Path): _description_
+        multiple (int, optional): _description_. Defaults to 50.
+
+    Returns:
+        int: _description_
+    """
     logger.info(f"Start speeding up videos in {folder_path}")
-    
+
     do_speedup: int = speedup_videos(folder_path, multiple)
-    
+
     return do_speedup
 
 
 def main() -> None:
+    """_summary_"""
     handle_speedup: HandleSpeedup = {"start_hour": 23, "end_hour": 5}
 
     base_path: Path = Path("H:", "data", "94f827b4b94e")

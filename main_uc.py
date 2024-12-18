@@ -1,27 +1,27 @@
+from app import config, tasks
+from pathlib import Path
+from app import upload_handler, logger, load_assignment
 import asyncio
-import nodriver as uc
-from app import logger
-from app import *
 
-browser = await uc.start(
-    headless=False,
-    # user_data_dir="/path/to/existing/profile",  # by specifying it, it won't be automatically cleaned up when finished
-    browser_executable_path=None,
-    # browser_args=["--some-browser-arg=true", "--some-other-option"],
-    # lang="en-US",  # this could set iso-language-code in navigator, not recommended to change
+assignment_name: str = config.ACTIONS["uploader"]
+assignment_info_file: Path = config.APP_PATHS["program_data"] / (
+    assignment_name + ".json"
 )
-tab = await browser.get("https://somewebsite.com")
+# assignment_info: tasks.UploaderInfo = load_assignment(assignment_info_file)
 
 
-browser = await uc.start()
-page = await browser.get("https://google.com")
-await page.save_screenshot()
-await page.get_content()
-await page.scroll_down(150)
+task: tasks.UploaderTask = {
+    "name": (name := "abc"),
+    "local_album_path": Path(),
+    "GPhoto_url": "",
+    "browser_config": {
+        "user_data_dir": Path(config.APP_PATHS["app_data"]) / name,
+        "browser_executable_path": Path(
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+        ),
+    },
+}
 
-# save. when no filepath is given, it is saved in '.session.dat'
-await browser.cookies.save()
 
-# load. when no filepath is given, it is loaded from '.session.dat'
-await browser.cookies.load()
-browser.stop()
+async def main():
+    browser = await upload_handler(task)

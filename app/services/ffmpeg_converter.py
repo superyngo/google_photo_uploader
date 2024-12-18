@@ -14,9 +14,9 @@ class EncodeKwargs(TypedDict):
     f: NotRequired[str]
 
 
-def probe_encoding_info(file_path: str) -> EncodeKwargs:
+def probe_encoding_info(file_path: Path) -> EncodeKwargs:
     # Probe the video file to get metadata
-    probe = ffmpeg.probe(file_path)
+    probe = ffmpeg.probe(str(file_path))
 
     # Initialize the dictionary with default values
     encoding_info: EncodeKwargs = {}
@@ -43,18 +43,21 @@ def probe_encoding_info(file_path: str) -> EncodeKwargs:
     # Extract format information
     format_info = probe.get("format", {})
     encoding_info["f"] = format_info.get("format_name").split(",")[0]
-    cleaned_None: EncodeKwargs = {
-        k: v for k, v in encoding_info.items() if v is not None or v != 0
-    }
+    cleaned_None = {k: v for k, v in encoding_info.items() if v is not None or v != 0}
+    logger.info(file_path.name + " probed:", cleaned_None)
 
     return cleaned_None
 
 
-def speedup(input_file: Path, output_file: Path, speed: int, **othertags) -> int:
+def speedup(
+    input_file: Path,
+    output_file: Path,
+    speed: int,
+    **othertags,
+) -> int:
     temp_output_file: Path = output_file.parent / (
         output_file.stem + "_processing_" + output_file.suffix
     )
-
     try:
         # Speedup the video using ffmpeg-python
         (

@@ -1,5 +1,6 @@
 from typing import TypedDict, NotRequired
 from pathlib import Path
+from ..services.my_driver import MyDriverConfig
 
 
 class CsBasicComponent:
@@ -38,17 +39,11 @@ class SpeedupTask(TypedDict):
     multiple: int
 
 
-# UploaderSession
 class UploaderTask(TypedDict):
-    local_album: Path
-    GPhoto_url: str
-
-
-class UploaderSession(TypedDict):
     name: str
-    profile: Path
-    chrome_path: Path | None
-    tasks: list[UploaderTask]
+    local_album_path: Path
+    GPhoto_url: str
+    browser_config: NotRequired[MyDriverConfig]
 
 
 # Actions
@@ -57,13 +52,13 @@ class AssignmentInfo(TypedDict):
     selected: set[int] | None
 
 
-class UploaderInfo(AssignmentInfo):
-    action: list[UploaderSession]
-
-
 class SpeedupInfo(AssignmentInfo):
     action: list[SpeedupTask]
 
 
 class MideoMergerInfo(AssignmentInfo):
     action: list[MideoMergerTask]
+
+
+class UploaderInfo(AssignmentInfo):
+    action: list[MyDriverConfig]

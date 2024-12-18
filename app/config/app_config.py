@@ -10,22 +10,6 @@ os.environ["HTTP_PROXY"] = ""
 APP_NAME: LiteralString = "MideoToGPhoto"
 
 
-class _AppPaths(TypedDict):
-    program_data: Path
-    app_data: Path
-    config: Path
-    logs: Path
-
-
-# set app base path
-APP_PATHS: _AppPaths = {
-    "program_data": (program_data := Path(os.environ["APPDATA"]) / APP_NAME),
-    "config": program_data / "config.conf",
-    "app_data": (app_data := Path(os.environ["PROGRAMDATA"])),
-    "logs": app_data / APP_NAME / "Logs",
-}
-
-
 class _Actions(TypedDict):
     converter: str
     speedup: str
@@ -38,6 +22,23 @@ ACTIONS: _Actions = {
     "speedup": "speedup",
     "uploader": "GPhoto_upload",
 }
+
+
+class _AppPaths(TypedDict):
+    program_data: Path
+    app_data: Path
+    config: Path
+    logs: Path
+
+
+# set app base path
+APP_PATHS: _AppPaths = {
+    "program_data": (program_data := Path(os.environ["APPDATA"]) / APP_NAME),
+    "config": program_data / "config.conf",
+    "app_data": (app_data := Path(os.environ["PROGRAMDATA"]) / APP_NAME),
+    "logs": app_data / "Logs",
+}
+
 
 # set converter
 # HANDLE_SPEEDUP: HandleSpeedup = {'start_hour': 23, 'end_hour': 5}
