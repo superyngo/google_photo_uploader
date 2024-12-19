@@ -11,6 +11,7 @@
         "datestamp",
         "ffprobe",
         "filechooser",
+        "funcs",
         "jumpcut",
         "kivy",
         "mideo",
@@ -23,7 +24,8 @@
         "setpts",
         "vcodec",
         "viewmodels",
-        "vsync"
+        "vsync",
+        "zendriver"
     ],
     "ignoreWords": [],
     "import": []
