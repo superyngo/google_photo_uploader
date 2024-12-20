@@ -24,7 +24,7 @@ task: tasks.UploaderTask = {
 
 
 async def main():
-    browser = await upload_handler(task)
+    do_upload = await upload_handler(task)
 
 
 # browser.restart()

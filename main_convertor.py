@@ -13,9 +13,31 @@ def main() -> None:
     }
     mideo_converter.merger_handler(**merge_task_info)
 
-    speedup_task_info: SpeedupTask = {"folder_path": target_path, "multiple": 50}
+    speedup_task_info: SpeedupTask = {
+        "folder_path": Path(r"C:\Users\user\Downloads"),
+        "multiple": 50,
+    }
     mideo_converter.speedup_handler(**speedup_task_info)
 
 
 if __name__ == "__main__":
     main()
+
+# interval=6
+# lasting=1
+# input_file=Path(r"C:\Users\user\Downloads\2024-12-19.mkv")
+# output_file=r"C:\Users\user\Downloads\2024-12-19_speedup.mkv"
+
+# ffmpeg_converter.probe_encoding_info(input_file)
+
+# ffmpeg.input(input_file)
+#             .output(
+#                 str(output_file),
+#                 vf=f"select='lte(mod(t,{interval}),{lasting})',setpts={1/speed}*PTS",
+#                 af=f"aselect='lte(mod(t,{interval}),{lasting})',atempo={speed}",
+#                 map=0,
+#                 shortest=None,
+#                 fps_mode="vfr",
+#                 **othertags,
+#             )
+#             .run()

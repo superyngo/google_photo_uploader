@@ -4,7 +4,6 @@ from pathlib import Path
 from ..utils import composer
 import time, os
 
-
 # Multiton state
 _instances: dict[Path, zd.Browser] = {}
 
