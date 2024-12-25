@@ -55,12 +55,12 @@ def list_video_files(
     return video_files
 
 
-def get_speedup_range(start_hour: int, end_hour: int) -> range | list[int]:
-    # Create the speedup range, handling wrap-around at midnight
-    if end_hour >= start_hour:
-        return range(start_hour, end_hour + 1)
-    else:
-        return list(range(start_hour, 25)) + list(range(0, end_hour + 1))
+# def get_speedup_range(start_hour: int, end_hour: int) -> range | list[int]:
+#     # Create the speedup range, handling wrap-around at midnight
+#     if end_hour >= start_hour:
+#         return range(start_hour, end_hour + 1)
+#     else:
+#         return list(range(start_hour, 25)) + list(range(0, end_hour + 1))
 
 
 type GroupedVideos = dict[date, dict[int, Path]]
@@ -116,7 +116,7 @@ def merge_videos(video_dict: GroupedVideos, save_path: Path, delete_after: bool)
         # Prepare the input file list for ffmpeg
         input_files: list[Path] = []
         for video_path in sorted_videos.values():
-            if ffmpeg_converter.is_valid(video_path):
+            if ffmpeg_converter.is_valid_video(video_path):
                 input_files.append(video_path)
                 dir_to_delete.add(video_path.parent)
 
@@ -171,7 +171,10 @@ def merge_videos(video_dict: GroupedVideos, save_path: Path, delete_after: bool)
 
 
 def speedup_videos(
-    input_folder: Path, multiple: int, output_folder_name: str = "speedup"
+    input_folder: Path,
+    multiple: int | float,
+    output_folder_name: str = "speedup",
+    **otherkwargs,
 ):
     """_summary_
 
@@ -191,7 +194,9 @@ def speedup_videos(
             ffmpeg_converter.probe_encoding_info(video)
         )
         output_file: Path = output_folder / (video.stem + "_speedup" + video.suffix)
-        ffmpeg_converter.speedup(video, output_file, multiple, **original_encode)
+        ffmpeg_converter.speedup(
+            video, output_file, multiple, **original_encode, **otherkwargs
+        )
         logger.info(
             f"Speeding up video saved to {output_file}, set timestamps as the original file."
         )

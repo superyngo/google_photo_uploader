@@ -52,11 +52,11 @@ def probe_encoding_info(file_path: Path) -> EncodeKwargs:
 def speedup(
     input_file: Path,
     output_file: Path,
-    speed: int,
+    multiple: float | int,
     **othertags,
 ) -> int:
     logger.info(
-        f"speedup {input_file} to {output_file} with speed {speed} and {othertags = }"
+        f"speedup {input_file} to {output_file} with speed {multiple} and {othertags = }"
     )
     temp_output_file: Path = output_file.parent / (
         output_file.stem + "_processing_" + output_file.suffix
@@ -64,26 +64,24 @@ def speedup(
     try:
         # Speedup the video using ffmpeg-python
         (
-            # ffmpeg.input(input_file)
-            # .output(
-            #     str(temp_output_file),
-            #     vf=f"select='not(mod(n,{speed}))',setpts=N/FRAME_RATE/TB",
-            #     af=f"aselect='not(mod(n,{speed}))',asetpts=N/SR/TB",
-            #     map=0,
-            #     shortest=None,
-            #     fps_mode="vfr",
-            #     **othertags,
-            # )
-            # .run(),
-            ffmpeg.input(input_file)
-            .output(
+            ffmpeg.input(input_file).output(
                 str(temp_output_file),
-                vf=f"setpts={1/speed}*PTS",
-                af=f"atempo={speed}",
+                vf=f"select='not(mod(n,{multiple}))',setpts=N/FRAME_RATE/TB",
+                af=f"aselect='not(mod(n,{multiple}))',asetpts=N/SR/TB",
                 map=0,
                 shortest=None,
                 fps_mode="vfr",
+                **othertags,
             )
+            # ffmpeg.input(input_file)
+            # .output(
+            #     str(temp_output_file),
+            #     vf=f"setpts={1/multiple}*PTS",
+            #     af=f"atempo={multiple}",
+            #     map=0,
+            #     shortest=None,
+            #     fps_mode="vfr",
+            # )
             .run(),
         )
         temp_output_file.replace(output_file)
@@ -96,9 +94,9 @@ def speedup(
 def jumpcut_speedup(
     input_file: Path,
     output_file: Path,
-    interval: int,
-    lasting: int,
-    speed: int | None = 0,
+    interval: float | int,
+    lasting: float | int,
+    multiple: float | int | None = 0,  # unwated part speedup instead of cut
     **othertags,
 ) -> int:
     temp_output_file: Path = output_file.parent / (
@@ -106,8 +104,8 @@ def jumpcut_speedup(
     )
     frame_select_expr: str = (
         f"lte(mod(t,{interval}),{lasting})"
-        if speed in (0, None)
-        else f"if(lte(mod(t,{interval}),{lasting}),1,not(mod(n,{speed})))"
+        if multiple in (0, None)
+        else f"if(lte(mod(t,{interval}),{lasting}),1,not(mod(n,{multiple})))"
     )
     try:
         # Speedup the video using ffmpeg-python
@@ -131,7 +129,7 @@ def jumpcut_speedup(
     return 0
 
 
-def convert(input_file: Path, output_file: Path, **othertags) -> int:
+def convert(input_file: Path, output_file: Path, **othertags: EncodeKwargs) -> int:
     temp_output_file: Path = output_file.parent / (
         output_file.stem + "_processing_" + output_file.suffix
     )
@@ -165,7 +163,7 @@ def merge(input_txt: str, output_file: str | Path) -> int:
         raise e
 
 
-def is_valid(file_path: Path | str) -> bool:
+def is_valid_video(file_path: Path | str) -> bool:
     """Function to check if a video file is valid using ffprobe."""
     try:
         ffmpeg.probe(file_path)
@@ -176,16 +174,6 @@ def is_valid(file_path: Path | str) -> bool:
         message = f"Checking file: {file_path}, Error: {e.stderr.decode()}"
         logger.info(message)
         return False
-
-
-def re_encode(input_file: str, output_file: str, **othertags: EncodeKwargs) -> int:
-    try:
-        # Re encode the video using ffmpeg-python
-        (ffmpeg.input(input_file).output(output_file, map=0, **othertags).run())
-    except ffmpeg.Error as e:
-        logger.error(f"Failed to re encode videos for {input_file}. Error: {e.stderr}")
-        raise e
-    return 0
 
 
 def cut(
