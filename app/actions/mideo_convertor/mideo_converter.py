@@ -90,7 +90,9 @@ def group_files_by_date(video_files: list[Path], start_hour: int = 0) -> Grouped
     return grouped_files
 
 
-def merge_videos(video_dict: GroupedVideos, save_path: Path, delete_after: bool) -> int:
+def merge_videos(
+    video_dict: GroupedVideos, save_path: Path, delete_after: bool, **otherkwargs
+) -> int:
     """_summary_
 
     Args:
@@ -134,7 +136,7 @@ def merge_videos(video_dict: GroupedVideos, save_path: Path, delete_after: bool)
         logger.info(f"{output_file = }")
         try:
             # Use ffmpeg to concatenate videos
-            ffmpeg_converter.merge("input.txt", output_file)
+            ffmpeg_converter.merge("input.txt", output_file, **otherkwargs)
         except ffmpeg_converter.ffmpeg_Error as e:
             logger.error(
                 f"Failed to concatenate videos for {date_key}. Error: {e.stderr.decode()}"
@@ -174,14 +176,16 @@ def speedup_videos(
     input_folder: Path,
     multiple: int | float,
     output_folder_name: str = "speedup",
+    same_encode: bool = True,
     **otherkwargs,
 ):
     """_summary_
 
     Args:
         input_folder (Path): _description_
-        multiple (int): _description_
+        multiple (int | float): _description_
         output_folder_name (str, optional): _description_. Defaults to "speedup".
+        same_encode (bool, optional): _description_. Defaults to True.
 
     Returns:
         _type_: _description_
@@ -190,12 +194,15 @@ def speedup_videos(
     output_folder.mkdir(parents=True, exist_ok=True)
     mkv_video_files: list[Path] = list_video_files(input_folder, {".mkv"}, False)
     for video in mkv_video_files:
-        original_encode: ffmpeg_converter.EncodeKwargs = (
-            ffmpeg_converter.probe_encoding_info(video)
-        )
+        if same_encode:
+            original_encode: ffmpeg_converter.EncodeKwargs = (
+                ffmpeg_converter.probe_encoding_info(video)
+            )
+        else:
+            original_encode = {}
         output_file: Path = output_folder / (video.stem + "_speedup" + video.suffix)
         ffmpeg_converter.speedup(
-            video, output_file, multiple, **original_encode, **otherkwargs
+            video, output_file, multiple, **(original_encode | otherkwargs)
         )
         logger.info(
             f"Speeding up video saved to {output_file}, set timestamps as the original file."
@@ -204,9 +211,7 @@ def speedup_videos(
 
 
 def merger_handler(
-    folder_path: Path,
-    start_hour: int = 6,
-    delete_after: bool = True,
+    folder_path: Path, start_hour: int = 6, delete_after: bool = True, **otherkwargs
 ) -> int:
     """_summary_
 
@@ -224,14 +229,15 @@ def merger_handler(
 
     grouped_videos: GroupedVideos = group_files_by_date(video_files, start_hour)
 
-    do_merge: int = merge_videos(grouped_videos, folder_path, delete_after)
+    do_merge: int = merge_videos(
+        grouped_videos, folder_path, delete_after, **otherkwargs
+    )
 
     return do_merge
 
 
 def speedup_handler(
-    folder_path: Path,
-    multiple: int = 50,
+    folder_path: Path, multiple: int | float = 50, **otherkwargs
 ) -> int:
     """_summary_
 
@@ -244,7 +250,7 @@ def speedup_handler(
     """
     logger.info(f"Start speeding up videos in {folder_path}")
 
-    do_speedup: int = speedup_videos(folder_path, multiple)
+    do_speedup: int = speedup_videos(folder_path, multiple, **otherkwargs)
 
     return do_speedup
 

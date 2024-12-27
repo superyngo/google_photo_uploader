@@ -36,7 +36,7 @@ task: tasks.UploaderTask = {
     "local_album_path": Path(),
     "GPhoto_url": "",
     "browser_config": {
-        "user_data_dir": Path(config.APP_PATHS["app_data"]) / name,
+        "user_data_dir": Path(config.AppPaths.APP_DATA) / name,
         "browser_executable_path": Path(
             r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
         ),

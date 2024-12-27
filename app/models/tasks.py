@@ -36,7 +36,8 @@ class MideoMergerTask(TypedDict):
 # SpeedupTask
 class SpeedupTask(TypedDict):
     folder_path: Path
-    multiple: int
+    multiple: int | float
+    same_encode: NotRequired[bool]
 
 
 class UploaderTask(TypedDict):

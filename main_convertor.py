@@ -5,7 +5,9 @@ from pathlib import Path
 
 
 def main() -> None:
-    target_path: Path = Path(r"H:\data\94f827b4b94e")
+    target_path: Path = Path(
+        r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample"
+    )
     merge_task_info: MideoMergerTask = {
         "folder_path": target_path,
         "start_hour": 6,
@@ -14,8 +16,11 @@ def main() -> None:
     mideo_converter.merger_handler(**merge_task_info)
 
     speedup_task_info: SpeedupTask = {
-        "folder_path": Path(r"C:\Users\user\Downloads"),
-        "multiple": 50,
+        "folder_path": Path(
+            r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample"
+        ),
+        "multiple": 101,
+        "same_encode": False,
     }
     mideo_converter.speedup_handler(**speedup_task_info)
 

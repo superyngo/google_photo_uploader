@@ -1,5 +1,8 @@
 @echo off
+REM ffmpeg -y -i 2024-12-19_cut.mkv -vf "select='lte(mod(t,60),2)',setpts=N/FRAME_RATE/TB" -af "aselect='lte(mod(t,60),2)',asetpts=N/SR/TB" -shortest -vsync vfr output.mkv
+REM ffmpeg -y -i IMG_1117.mp4 -vf "select='if(lte(mod(t,60),2),1,1)',setpts=N/FRAME_RATE/TB" -af "aselect='if(lte(mod(t,60),2),1,1)',asetpts=N/SR/TB" -shortest -vsync vfr output.mkv
 
+if(lte(mod(t,60),2),not(mod(n,100)),not(mod(n,100)))
 
 REM Set the interval 
 set "interval=60"

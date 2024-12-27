@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 from typing import LiteralString, TypedDict
+from enum import StrEnum, Enum, auto
+from ..types.types import PathEnum
 
 
 os.environ["HTTPS_PROXY"] = ""
@@ -10,29 +12,21 @@ os.environ["HTTP_PROXY"] = ""
 APP_NAME: LiteralString = "MideoToGPhoto"
 
 
-class _Actions(TypedDict):
-    converter: str
-    speedup: str
-    uploader: str
+class Actions(StrEnum):
+    CONVERTOR: str = "mideo_converter"
+    SPEEDUP: str = "speedup"
+    UPLOADER: str = "GPhoto_upload"
 
 
-# actions
-ACTIONS: _Actions = {
-    "converter": "mideo_converter",
-    "speedup": "speedup",
-    "uploader": "GPhoto_upload",
-}
-
-
-class _AppPaths(TypedDict):
-    program_data: Path
-    app_data: Path
-    config: Path
-    logs: Path
+class AppPaths(PathEnum):
+    PROGRAM_DATA: Path = Path(os.environ["APPDATA"]) / APP_NAME
+    APP_DATA: Path = PROGRAM_DATA / "config.conf"
+    CONFIG: Path = Path(os.environ["PROGRAMDATA"]) / APP_NAME
+    LOGS: Path = APP_DATA / "Logs"
 
 
 # set app base path
-APP_PATHS: _AppPaths = {
+APP_PATHS = {
     "program_data": (program_data := Path(os.environ["APPDATA"]) / APP_NAME),
     "config": program_data / "config.conf",
     "app_data": (app_data := Path(os.environ["PROGRAMDATA"]) / APP_NAME),
