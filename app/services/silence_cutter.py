@@ -5,6 +5,10 @@ import tempfile
 import sys
 import os
 import logging
+import json
+import re
+from collections import deque
+import ffmpeg
 
 # ===========================
 # ==== Configure logging ====
@@ -17,7 +21,7 @@ log_handler = logging.FileHandler(log_filename, delay=True)
 logger.addHandler(log_handler)
 
 
-def findSilences(filename, dB=-35):
+def findSilences(filename, dB=-35) -> deque[float]:
     """
     returns a list:
       even elements (0,2,4, ...) denote silence start time
@@ -28,36 +32,40 @@ def findSilences(filename, dB=-35):
     logging.debug(f"    - filename = {filename}")
     logging.debug(f"    - dB = {dB}")
 
-    command = [
-        "ffmpeg",
-        "-i",
-        filename,
-        "-af",
-        "silencedetect=n=" + str(dB) + "dB:d=1",
-        "-f",
-        "null",
-        "-",
-    ]
-    print(command)
-    output = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    s = str(output)
-    lines = s.split("\\r\\n")
-    time_list = []
-    logging.debug("  lines: ```\n" + "\n".join(lines) + "```\n\n")
+    # command = [
+    #     "ffmpeg",
+    #     "-i",
+    #     filename,
+    #     "-af",
+    #     "silencedetect=n=" + str(dB) + "dB:d=1",
+    #     "-f",
+    #     "null",
+    #     "-",
+    # ]
+    # output = subprocess.run(
+    #     command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    # ).stderr.decode("utf-8")
 
-    for line in lines:
-        if "silencedetect" in line:
-            words = line.split(" ")
-            logging.debug("  words: " + str(words))
-            for i in range(len(words)):
-                if "silence_start" in words[i]:
-                    time_list.append(float(words[i + 1]))
-                if "silence_end" in words[i]:
-                    time_list.append(float(words[i + 1]))
-    silence_section_list = list(zip(*[iter(time_list)] * 2))
+    output = (
+        ffmpeg.input(filename)
+        .output("null", af="silencedetect=n={}dB:d=1".format(dB), f="null")
+        .run(capture_stdout=True, capture_stderr=True)
+    )[1].decode("utf-8")
 
-    # return silence_section_list
-    return time_list
+    # Regular expression to find all floats after "silence_start or end: "
+    pattern = r"silence_(?:start|end): (\d+\.\d+|\d+)"
+
+    # Find all matches in the log data
+    matches = re.findall(pattern, output)
+
+    # Convert matches to a list of floats
+    silence_end_floats: deque[float] = deque(float(match) for match in matches)
+
+    # Handle silence start and end
+    silence_end_floats.appendleft(0.0)
+    silence_end_floats.append(float(getVideoDuration(filename)))
+
+    return silence_end_floats
 
 
 def getVideoDuration(filename: str) -> float:
@@ -96,6 +104,13 @@ def ffmpeg_filter_getSegmentFilter(videoSectionTimings):
     # cut away last "+"
     ret = ret[:-1]
     return ret
+
+
+def ffmpeg_filter_getSegmentFilter(videoSectionTimings):
+    return "+".join(
+        f"between(t,{videoSectionTimings[2 * i]},{videoSectionTimings[2 * i + 1]})"
+        for i in range(len(videoSectionTimings) // 2)
+    )
 
 
 def getFileContent_videoFilter(videoSectionTimings):
@@ -176,12 +191,22 @@ def cut_silences(infile, outfile, dB=-35):
     logging.debug(f"    - dB = {dB}")
 
     print("detecting silences")
-    silences = findSilences(infile, dB)
-    duration = getVideoDuration(infile)
-    videoSegments = getSectionsOfNewVideo(silences, duration)
+    silences: deque[float] = findSilences(infile, dB)
+    with open("1_silences.json", "w") as file:
+        json.dump(list(silences), file)
 
-    videoFilter = getFileContent_videoFilter(videoSegments)
-    audioFilter = getFileContent_audioFilter(videoSegments)
+    # duration = getVideoDuration(infile)
+    # with open("2_duration.json", "w") as file:
+    #     json.dump(duration, file)
+    # videoSegments = getSectionsOfNewVideo(silences, duration)
+
+    videoFilter = getFileContent_videoFilter(silences)
+    with open("4_videoFilter.json", "w") as file:
+        json.dump(videoFilter, file)
+
+    audioFilter = getFileContent_audioFilter(silences)
+    with open("4_audioFilter.json", "w") as file:
+        json.dump(audioFilter, file)
 
     print("create new video")
     ffmpeg_run(infile, videoFilter, audioFilter, outfile)

@@ -4,8 +4,8 @@ from ..utils import logger
 from typing import TypedDict, NotRequired, Literal
 from pathlib import Path
 from enum import StrEnum, auto
-
-SPEEDUP_METHOD_THRSHOLD: int = 4
+from collections import deque
+import re
 
 
 class methods(StrEnum):
@@ -27,8 +27,18 @@ class EncodeKwargs(TypedDict):
     f: NotRequired[str]
 
 
+def probe_duration(file_path: Path) -> float:
+    logger.info(f"Probing {file_path.name} duration")
+
+    probe = ffmpeg.probe(str(file_path))
+    s = probe["format"]["duration"]
+    logger.info(f"{file_path.name} duration probed: {s}")
+
+    return float(s)
+
+
 def probe_encoding_info(file_path: Path) -> EncodeKwargs:
-    logger.info(f"Probing {file_path}")
+    logger.info(f"Probing {file_path.name} encoding info")
     # Probe the video file to get metadata
     probe = ffmpeg.probe(str(file_path))
 
@@ -63,12 +73,39 @@ def probe_encoding_info(file_path: Path) -> EncodeKwargs:
     return cleaned_None
 
 
+def detect_silence(file_path: Path, dB=-35, lasting=1) -> deque[float]:
+    logger.info(f"Detecting silences in {file_path.name} with {dB = }")
+
+    output = (
+        ffmpeg.input(str(file_path))
+        .output("null", af=f"silencedetect=n={dB}dB:d={lasting}", f="null")
+        .run(capture_stdout=True, capture_stderr=True)
+    )[1].decode("utf-8")
+
+    # Regular expression to find all floats after "silence_start or end: "
+    pattern = r"silence_(?:start|end): (\d+\.\d+|\d+)"
+
+    # Find all matches in the log data
+    matches = re.findall(pattern, output)
+
+    # Convert matches to a list of floats
+    silence_end_floats: deque[float] = deque(float(match) for match in matches)
+
+    # Handle silence start and end
+    silence_end_floats.appendleft(0.0)
+    silence_end_floats.append(float(probe_duration(file_path)))
+
+    return silence_end_floats
+
+
 def speedup(
     input_file: Path,
     output_file: Path | None,
     multiple: float | int,
     **othertags,
 ) -> int:
+    SPEEDUP_METHOD_THRSHOLD: int = 4
+
     if output_file is None:
         output_file = input_file.parent / (
             input_file.name + "_" + methods.SPEEDUP + input_file.suffix
@@ -259,3 +296,12 @@ def cut(
         logger.error(f"Failed to cut videos for {input_file}. Error: {e.stderr}")
         raise e
     return 0
+
+
+def cut_silence(file_path: Path, dB=-35, lasting=1, **othertags: EncodeKwargs) -> int:
+    silences: deque[float] = detect_silence(file_path, dB, lasting)
+    videoFilter = getFileContent_videoFilter(silences)
+    audioFilter = getFileContent_audioFilter(silences)
+    ffmpeg_run(infile, videoFilter, audioFilter, outfile)
+
+    pass
