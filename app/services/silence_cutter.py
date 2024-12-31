@@ -9,6 +9,8 @@ import json
 import re
 from collections import deque
 import ffmpeg
+from enum import Enum, StrEnum
+from collections.abc import Generator, Any
 
 # ===========================
 # ==== Configure logging ====
@@ -19,6 +21,11 @@ logger = logging.getLogger("")
 logger.setLevel(log_level)
 log_handler = logging.FileHandler(log_filename, delay=True)
 logger.addHandler(log_handler)
+
+
+class FilterType(Enum):
+    VIDEO = ["select='", "', setpts=N/FRAME_RATE/TB"]
+    AUDIO = ["aselect='", "', asetpts=N/SR/TB"]
 
 
 def findSilences(filename, dB=-35) -> deque[float]:
@@ -113,11 +120,15 @@ def ffmpeg_filter_getSegmentFilter(videoSectionTimings):
     )
 
 
-def getFileContent_videoFilter(videoSectionTimings):
-    ret = "select='"
-    ret += ffmpeg_filter_getSegmentFilter(videoSectionTimings)
-    ret += "', setpts=N/FRAME_RATE/TB"
-    return ret
+def gen_filter(
+    filter_type: FilterType.VIDEO | FilterType.AUDIO, videoSectionTimings: list[float]
+) -> Generator[str, None, None]:
+    yield filter_type.value[0]
+    yield from (
+        f"between(t,{videoSectionTimings[2 * i]},{videoSectionTimings[2 * i + 1]})+"
+        for i in range(len(videoSectionTimings) // 2)
+    )
+    yield filter_type.value[1]
 
 
 def getFileContent_audioFilter(videoSectionTimings):
@@ -200,13 +211,9 @@ def cut_silences(infile, outfile, dB=-35):
     #     json.dump(duration, file)
     # videoSegments = getSectionsOfNewVideo(silences, duration)
 
-    videoFilter = getFileContent_videoFilter(silences)
-    with open("4_videoFilter.json", "w") as file:
-        json.dump(videoFilter, file)
+    videoFilter = get_video_content(FilterType.VIDEO, silences)
 
-    audioFilter = getFileContent_audioFilter(silences)
-    with open("4_audioFilter.json", "w") as file:
-        json.dump(audioFilter, file)
+    audioFilter = get_video_content(FilterType.AUDIO.value, silences)
 
     print("create new video")
     ffmpeg_run(infile, videoFilter, audioFilter, outfile)

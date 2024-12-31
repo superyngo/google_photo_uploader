@@ -1,12 +1,12 @@
 from pathlib import Path
 import pdb
-from app.services.silence_cutter import *
 from app.services import ffmpeg_converter
 
-filename = Path(r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\output.mp4")
-output = r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\output_cut.mp4"
-cut_silences(filename, output)
-ffmpeg_converter.silencedetect(filename)
+filename = Path(
+    r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\output.mp4"
+)
+output = r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\IMG_1117_cut.mp4"
+ffmpeg_converter.cut_silence(filename)
 # Your script code here
 print("This is a script in debug mode.")
 

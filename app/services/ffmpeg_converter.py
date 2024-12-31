@@ -5,13 +5,20 @@ from typing import TypedDict, NotRequired, Literal
 from pathlib import Path
 from enum import StrEnum, auto
 from collections import deque
+from collections.abc import Generator
 import re
+from enum import Enum
+import tempfile
+import time
+import os
+import argparse
 
 
 class methods(StrEnum):
     SPEEDUP = auto()
     JUMPCUT = auto()
     CONVERT = auto()
+    CUT_SILENCE = auto()
     CUT = auto()
     MERGE = auto()
     PROBE_ENCODING_INFO = auto()
@@ -25,6 +32,19 @@ class EncodeKwargs(TypedDict):
     acodec: NotRequired[str]
     ar: NotRequired[int]
     f: NotRequired[str]
+
+
+def gen_filter(
+    filter_text: list[str],
+    videoSectionTimings: list[float],
+) -> Generator[str, None, None]:
+    yield filter_text[0]
+    yield from (
+        f"between(t,{videoSectionTimings[2 * i]},{videoSectionTimings[2 * i + 1]})"
+        + ("+" if i < len(videoSectionTimings) // 2 - 1 else "")
+        for i in range(len(videoSectionTimings) // 2)
+    )
+    yield filter_text[1]
 
 
 def probe_duration(file_path: Path) -> float:
@@ -73,17 +93,17 @@ def probe_encoding_info(file_path: Path) -> EncodeKwargs:
     return cleaned_None
 
 
-def detect_silence(file_path: Path, dB=-35, lasting=1) -> deque[float]:
+def detect_silence(file_path: Path, dB: int = -35, duration: float = 1) -> deque[float]:
     logger.info(f"Detecting silences in {file_path.name} with {dB = }")
 
     output = (
         ffmpeg.input(str(file_path))
-        .output("null", af=f"silencedetect=n={dB}dB:d={lasting}", f="null")
+        .output("null", af=f"silencedetect=n={dB}dB:d={duration}", f="null")
         .run(capture_stdout=True, capture_stderr=True)
     )[1].decode("utf-8")
 
     # Regular expression to find all floats after "silence_start or end: "
-    pattern = r"silence_(?:start|end): (\d+\.\d+|\d+)"
+    pattern = r"silence_(?:start|end): ([0-9.]+)"
 
     # Find all matches in the log data
     matches = re.findall(pattern, output)
@@ -111,7 +131,7 @@ def speedup(
             input_file.name + "_" + methods.SPEEDUP + input_file.suffix
         )
     temp_output_file: Path = output_file.parent / (
-        output_file.stem + "_processing_" + output_file.suffix
+        output_file.stem + "_processing_" + methods.SPEEDUP + output_file.suffix
     )
     output_kwargs: dict = (
         (
@@ -168,11 +188,9 @@ def jumpcut(
         logger.error(f"Both 'interval' and 'lasting' must be greater than 0.")
         return 1
     if output_file is None:
-        output_file = input_file.parent / (
-            input_file.name + "_" + methods.JUMPCUT + input_file.suffix
-        )
+        output_file = input_file.parent / (input_file.name + "_" + input_file.suffix)
     temp_output_file: Path = output_file.parent / (
-        output_file.stem + "_processing_" + output_file.suffix
+        output_file.stem + "_processing_" + methods.JUMPCUT + output_file.suffix
     )
     interval_multiple_expr: str | float = (
         f"not(mod(n,{interval_multiple}))"
@@ -215,7 +233,7 @@ def convert(
             input_file.name + "_" + methods.JUMPCUT + input_file.suffix
         )
     temp_output_file: Path = output_file.parent / (
-        output_file.stem + "_processing_" + output_file.suffix
+        output_file.stem + "_processing_" + methods.JUMPCUT + output_file.suffix
     )
 
     logger.info(f"{methods.CONVERT} {input_file} to {output_file} with {othertags = }")
@@ -275,7 +293,7 @@ def cut(
             input_file.name + "_" + methods.JUMPCUT + input_file.suffix
         )
     temp_output_file: Path = output_file.parent / (
-        output_file.stem + "_processing_" + output_file.suffix
+        output_file.stem + "_processing_" + methods.JUMPCUT + output_file.suffix
     )
 
     output_kwargs: dict = {
@@ -292,16 +310,85 @@ def cut(
             .output(str(output_file), **output_kwargs)
             .run()
         )
+        temp_output_file.replace(output_file)
     except ffmpeg.Error as e:
         logger.error(f"Failed to cut videos for {input_file}. Error: {e.stderr}")
         raise e
     return 0
 
 
-def cut_silence(file_path: Path, dB=-35, lasting=1, **othertags: EncodeKwargs) -> int:
-    silences: deque[float] = detect_silence(file_path, dB, lasting)
-    videoFilter = getFileContent_videoFilter(silences)
-    audioFilter = getFileContent_audioFilter(silences)
-    ffmpeg_run(infile, videoFilter, audioFilter, outfile)
+def create_CS_filter_tempfile(
+    filter_info: list[str],
+    videoSectionTimings: list[float],
+) -> Path:
+    with tempfile.NamedTemporaryFile(
+        delete=False, mode="w", encoding="UTF-8", prefix=filter_info[2]
+    ) as temp_file:
+        for line in gen_filter(filter_info, videoSectionTimings):
+            temp_file.write(line)
+            temp_file.write("\n")
+        path: Path = Path(temp_file.name)
+    return path
 
-    pass
+
+def cut_silence(
+    input_file: Path,
+    output_file: Path = None,
+    dB: int = -35,
+    duration: float = 1,
+    **othertags: EncodeKwargs,
+) -> int:
+    if duration <= 0:
+        logger.error(f"Duration must be greater than 0.")
+        return 1
+
+    if output_file is None:
+        output_file = input_file.parent / (
+            input_file.name + "_" + methods.CUT_SILENCE + input_file.suffix
+        )
+    temp_output_file: Path = output_file.parent / (
+        output_file.stem + "_processing_" + methods.CUT_SILENCE + output_file.suffix
+    )
+    logger.info(
+        f"{methods.CUT_SILENCE} {input_file} to {output_file} with {dB = } ,{duration = } and {othertags = }"
+    )
+
+    silences_segment: deque[float] = detect_silence(input_file, dB, duration)
+
+    class CSFiltersInfo(Enum):
+        VIDEO = [
+            "select='",
+            "', setpts=N/FRAME_RATE/TB",
+            f"temp_{time.strftime("%Y%m%d-%H%M%S")}_video_filter_",
+        ]
+        AUDIO = [
+            "aselect='",
+            "', asetpts=N/SR/TB",
+            f"temp_{time.strftime("%Y%m%d-%H%M%S")}_audio_filter_",
+        ]
+
+    video_filter_script: Path = create_CS_filter_tempfile(
+        CSFiltersInfo.VIDEO.value, silences_segment
+    )
+    audio_filter_script: Path = create_CS_filter_tempfile(
+        CSFiltersInfo.AUDIO.value, silences_segment
+    )
+
+    output_kwargs = {
+        "filter_script:v": video_filter_script,
+        "filter_script:a": audio_filter_script,
+    } | othertags
+
+    try:
+        (
+            ffmpeg.input(str(input_file))
+            .output(str(temp_output_file), **output_kwargs)
+            .run()
+        )
+        os.remove(video_filter_script)
+        os.remove(audio_filter_script)
+        temp_output_file.replace(output_file)
+    except ffmpeg.Error as e:
+        logger.error(f"Failed to cut silence for {input_file}. Error: {e.stderr}")
+        return 2
+    return 0
