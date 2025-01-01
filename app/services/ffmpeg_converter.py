@@ -1,7 +1,7 @@
 import ffmpeg
 from ffmpeg import Error as ffmpeg_Error
 from ..utils import logger
-from typing import TypedDict, NotRequired, Literal
+from typing import TypedDict, NotRequired
 from pathlib import Path
 from enum import StrEnum, auto
 from collections import deque
@@ -11,7 +11,7 @@ from enum import Enum
 import tempfile
 import time
 import os
-import argparse
+import concurrent.futures
 
 
 class methods(StrEnum):
@@ -40,9 +40,9 @@ def gen_filter(
 ) -> Generator[str, None, None]:
     yield filter_text[0]
     yield from (
-        f"between(t,{videoSectionTimings[2 * i]},{videoSectionTimings[2 * i + 1]})"
-        + ("+" if i < len(videoSectionTimings) // 2 - 1 else "")
-        for i in range(len(videoSectionTimings) // 2)
+        f"between(t,{videoSectionTimings[i]},{videoSectionTimings[i + 1]})"
+        + ("+" if i != len(videoSectionTimings) - 2 else "")
+        for i in range(0, len(videoSectionTimings), 2)
     )
     yield filter_text[1]
 
@@ -131,7 +131,7 @@ def speedup(
             input_file.name + "_" + methods.SPEEDUP + input_file.suffix
         )
     temp_output_file: Path = output_file.parent / (
-        output_file.stem + "_processing_" + methods.SPEEDUP + output_file.suffix
+        output_file.stem + "_processing" + output_file.suffix
     )
     output_kwargs: dict = (
         (
@@ -190,7 +190,7 @@ def jumpcut(
     if output_file is None:
         output_file = input_file.parent / (input_file.name + "_" + input_file.suffix)
     temp_output_file: Path = output_file.parent / (
-        output_file.stem + "_processing_" + methods.JUMPCUT + output_file.suffix
+        output_file.stem + "_processing" + output_file.suffix
     )
     interval_multiple_expr: str | float = (
         f"not(mod(n,{interval_multiple}))"
@@ -233,7 +233,7 @@ def convert(
             input_file.name + "_" + methods.JUMPCUT + input_file.suffix
         )
     temp_output_file: Path = output_file.parent / (
-        output_file.stem + "_processing_" + methods.JUMPCUT + output_file.suffix
+        output_file.stem + "_processing" + output_file.suffix
     )
 
     logger.info(f"{methods.CONVERT} {input_file} to {output_file} with {othertags = }")
@@ -288,15 +288,24 @@ def cut(
     end_time: str,
     **othertags: EncodeKwargs,
 ) -> int:
+    """Cut a video file using ffmpeg-python.
+
+    Raises:
+        e: _description_
+
+    Returns:
+        _type_: _description_
+    """
     if output_file is None:
         output_file = input_file.parent / (
-            input_file.name + "_" + methods.JUMPCUT + input_file.suffix
+            input_file.name + "_" + methods.CUT + input_file.suffix
         )
     temp_output_file: Path = output_file.parent / (
-        output_file.stem + "_processing_" + methods.JUMPCUT + output_file.suffix
+        output_file.stem + "_processing" + output_file.suffix
     )
 
     output_kwargs: dict = {
+        "ss": start_time,
         "to": end_time,
         "vcodec": "copy",
         "acodec": "copy",
@@ -306,8 +315,8 @@ def cut(
     try:
         # Re encode the video using ffmpeg-python
         (
-            ffmpeg.input(str(input_file), ss=start_time)
-            .output(str(output_file), **output_kwargs)
+            ffmpeg.input(str(input_file))
+            .output(str(temp_output_file), **output_kwargs)
             .run()
         )
         temp_output_file.replace(output_file)
@@ -325,8 +334,7 @@ def create_CS_filter_tempfile(
         delete=False, mode="w", encoding="UTF-8", prefix=filter_info[2]
     ) as temp_file:
         for line in gen_filter(filter_info, videoSectionTimings):
-            temp_file.write(line)
-            temp_file.write("\n")
+            temp_file.write(f"{line}\n")
         path: Path = Path(temp_file.name)
     return path
 
@@ -335,7 +343,7 @@ def cut_silence(
     input_file: Path,
     output_file: Path = None,
     dB: int = -35,
-    duration: float = 1,
+    duration: float = 0.2,
     **othertags: EncodeKwargs,
 ) -> int:
     if duration <= 0:
@@ -347,7 +355,7 @@ def cut_silence(
             input_file.name + "_" + methods.CUT_SILENCE + input_file.suffix
         )
     temp_output_file: Path = output_file.parent / (
-        output_file.stem + "_processing_" + methods.CUT_SILENCE + output_file.suffix
+        output_file.stem + "_processing" + output_file.suffix
     )
     logger.info(
         f"{methods.CUT_SILENCE} {input_file} to {output_file} with {dB = } ,{duration = } and {othertags = }"
@@ -388,6 +396,137 @@ def cut_silence(
         os.remove(video_filter_script)
         os.remove(audio_filter_script)
         temp_output_file.replace(output_file)
+    except ffmpeg.Error as e:
+        logger.error(f"Failed to cut silence for {input_file}. Error: {e.stderr}")
+        return 2
+    return 0
+
+
+def convert_seconds_to_time(seconds: float) -> str:
+    """Converts seconds to HH:MM:SS format."""
+    # Convert seconds to hours, minutes, and seconds
+    hours, remainder = divmod(int(seconds), 3600)
+    minutes, secs = divmod(remainder, 60)
+    milliseconds = int((seconds - int(seconds)) * 1000)
+    timestamp = f"{hours:02}:{minutes:02}:{secs:02}.{milliseconds:03}"
+    return timestamp
+
+
+def ensure_minimum_segment_length(
+    video_segments: list[float], min_duration: float = 120.0
+) -> list[float]:
+    """
+    Ensures that every segment in the video_segments list is at least min_duration seconds long.
+
+    Args:
+        video_segments (List[float]): List of start and end times in seconds.
+        min_duration (float): Minimum duration for each segment in seconds (default is 120 seconds).
+
+    Returns:
+        List[float]: Updated list of start and end times with adjusted segment durations.
+    """
+    updated_segments = []
+    for i in range(0, len(video_segments), 2):
+        start_time = video_segments[i]
+        end_time = video_segments[i + 1]
+        duration = end_time - start_time
+        if duration < min_duration:
+            # Calculate the difference between the minimum duration and the current duration
+            diff = min_duration - duration
+            # Adjust the start and end times to increase the duration to the minimum
+            start_time = max(0, start_time - diff / 2)
+            end_time = start_time + min_duration
+        updated_segments.extend([start_time, end_time])
+
+    return updated_segments
+
+
+def create_video_segments(
+    input_video: str, video_segments: deque[float]
+) -> list[list[Path], Path]:
+    """
+    Cuts the input video into segments
+    """
+    # Step 1: Validate input
+    if len(video_segments) % 2 != 0:
+        raise ValueError(
+            "video_segments must contain an even number of elements (start and end times)."
+        )
+
+    # Step 2: Create a temporary folder for storing cut videos
+    temp_dir: Path = Path(tempfile.mkdtemp())
+    cut_videos: list[Path] = []  # List to store paths of cut video segments
+
+    # Step 3: Use threading to process video segments
+    # Get the number of CPU cores
+    num_cores = os.cpu_count()
+
+    # Use ThreadPoolExecutor to manage the threads
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_cores) as executor:
+        futures = []
+        for i in range(0, len(video_segments), 2):
+            start_time = convert_seconds_to_time(video_segments[i])
+            end_time = convert_seconds_to_time(video_segments[i + 1])
+            if start_time == end_time:
+                continue
+            output_path: Path = temp_dir / f"{i // 2}.mp4"
+            cut_videos.append(output_path)
+
+            # Submit the cut task to the executor
+            future = executor.submit(
+                cut, input_video, output_path, start_time, end_time
+            )
+            futures.append(future)
+
+        # Optionally, wait for all futures to complete
+        concurrent.futures.wait(futures)
+
+    # Step 4: Sort the cut video paths by filename (index order)
+    cut_videos.sort(key=lambda video_file: int(video_file.stem))
+
+    # Step 5: Create input.txt for FFmpeg concatenation
+    input_txt_path: Path = temp_dir / "input.txt"
+    with open(input_txt_path, "w") as f:
+        for video_path in cut_videos:
+            f.write(f"file '{video_path}'\n")
+    return [cut_videos, input_txt_path]
+
+
+def cut_silence2(
+    input_file: Path,
+    output_file: Path = None,
+    dB: int = -35,
+    duration: float = 0.2,
+    **othertags: EncodeKwargs,
+) -> int:
+    if duration <= 0:
+        logger.error(f"Duration must be greater than 0.")
+        return 1
+
+    if output_file is None:
+        output_file = input_file.parent / (
+            input_file.name + "_" + methods.CUT_SILENCE + input_file.suffix
+        )
+    temp_output_file: Path = output_file.parent / (
+        output_file.stem + "_processing" + output_file.suffix
+    )
+    logger.info(
+        f"{methods.CUT_SILENCE} {input_file} to {output_file} with {dB = } ,{duration = } and {othertags = }"
+    )
+
+    silences_segment: deque[float] = detect_silence(input_file, dB, duration)
+    updated_segments = ensure_minimum_segment_length(silences_segment)
+    videos_segments, input_txt_path = create_video_segments(
+        input_file, updated_segments
+    )
+    try:
+        merge(input_txt_path, temp_output_file)
+        temp_output_file.replace(output_file)
+        # Step 7: Clean up temporary files
+        # for video_path in videos_segments:
+        #     os.remove(video_path)
+        # os.remove(input_txt_path)
+        # os.rmdir(input_txt_path.parent)
     except ffmpeg.Error as e:
         logger.error(f"Failed to cut silence for {input_file}. Error: {e.stderr}")
         return 2

@@ -1,12 +1,17 @@
 from pathlib import Path
 import pdb
 from app.services import ffmpeg_converter
+import ffmpeg
 
-filename = Path(
-    r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\output.mp4"
-)
-output = r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\IMG_1117_cut.mp4"
-ffmpeg_converter.cut_silence(filename)
+filename = Path(r"F:\Users\user\Downloads\IMG_1174.mp4")
+output = Path(r"F:\Users\user\Downloads\IMG_1174_cut.mp4")
+# ffmpeg_converter.cut_silence(filename)
+ffmpeg_converter.cut_silence2(filename)
+start_time = "00:00:14"
+end_time = "00:00:16"
+ffmpeg_converter.cut(filename, None, start_time, end_time)
+ffmpeg.input(str(filename), ss=start_time).output(str(output), to=end_time).run()
+
 # Your script code here
 print("This is a script in debug mode.")
 
