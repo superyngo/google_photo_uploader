@@ -430,15 +430,48 @@ def ensure_minimum_segment_length(
         start_time = video_segments[i]
         end_time = video_segments[i + 1]
         duration = end_time - start_time
-        if duration < min_duration:
+
+        if duration >= min_duration or len(video_segments) == 2:
+            updated_segments.extend([start_time, end_time])
+            continue
+
+        if i == len(video_segments) - 2:
+            # This is the last segment
+            start_time = end_time - min_duration
+        else:
             # Calculate the difference between the minimum duration and the current duration
             diff = min_duration - duration
             # Adjust the start and end times to increase the duration to the minimum
             start_time = max(0, start_time - diff / 2)
             end_time = start_time + min_duration
+
         updated_segments.extend([start_time, end_time])
 
     return updated_segments
+
+
+def merge_overlapping_segments(segments: list[float]) -> list[float]:
+    # Sort segments by start time
+    sorted_segments = sorted(
+        (segments[i], segments[i + 1]) for i in range(0, len(segments), 2)
+    )
+
+    merged_segments = []
+    current_start, current_end = sorted_segments[0]
+
+    for start, end in sorted_segments[1:]:
+        if start <= current_end:
+            # Overlapping segments, merge them
+            current_end = max(current_end, end)
+        else:
+            # No overlap, add the current segment and move to the next
+            merged_segments.extend([current_start, current_end])
+            current_start, current_end = start, end
+
+    # Add the last segment
+    merged_segments.extend([current_start, current_end])
+
+    return merged_segments
 
 
 def create_video_segments(
@@ -515,7 +548,19 @@ def cut_silence2(
     )
 
     silences_segment: deque[float] = detect_silence(input_file, dB, duration)
-    updated_segments = ensure_minimum_segment_length(silences_segment)
+    logger.info(f"Silences segments: ")
+    for i in range(0, len(silences_segment), 2):
+        logger.info(
+            f"Silence {i//2} start: {silences_segment[i]} end: {silences_segment[i+1]}"
+        )
+    updated_segments = merge_overlapping_segments(
+        ensure_minimum_segment_length(silences_segment)
+    )
+    logger.info(f"Updated segments: ")
+    for i in range(0, len(updated_segments), 2):
+        logger.info(
+            f"Segment {i//2} start: {updated_segments[i]} end: {updated_segments[i+1]}"
+        )
     videos_segments, input_txt_path = create_video_segments(
         input_file, updated_segments
     )
@@ -523,10 +568,10 @@ def cut_silence2(
         merge(input_txt_path, temp_output_file)
         temp_output_file.replace(output_file)
         # Step 7: Clean up temporary files
-        # for video_path in videos_segments:
-        #     os.remove(video_path)
-        # os.remove(input_txt_path)
-        # os.rmdir(input_txt_path.parent)
+        for video_path in videos_segments:
+            os.remove(video_path)
+        os.remove(input_txt_path)
+        os.rmdir(input_txt_path.parent)
     except ffmpeg.Error as e:
         logger.error(f"Failed to cut silence for {input_file}. Error: {e.stderr}")
         return 2
