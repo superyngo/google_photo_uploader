@@ -34,7 +34,14 @@ class MideoMergerTask(TypedDict):
 
 
 # SpeedupTask
-class SpeedupTask(TypedDict):
+class CutSlSpeedupTask(TypedDict):
+    folder_path: Path
+    multiple: int | float
+    same_encode: NotRequired[bool]
+
+
+# SpeedupTask
+class CutSlSpeedupTask(TypedDict):
     folder_path: Path
     multiple: int | float
     same_encode: NotRequired[bool]
@@ -54,7 +61,7 @@ class AssignmentInfo(TypedDict):
 
 
 class SpeedupInfo(AssignmentInfo):
-    action: list[SpeedupTask]
+    action: list[CutSlSpeedupTask]
 
 
 class MideoMergerInfo(AssignmentInfo):

@@ -1,6 +1,6 @@
 from app import mideo_converter
 from app import config
-from app.models.tasks import MideoMergerTask, SpeedupTask
+from app.models.tasks import MideoMergerTask, CutSlSpeedupTask
 from pathlib import Path
 
 
@@ -15,14 +15,14 @@ def main() -> None:
     }
     mideo_converter.merger_handler(**merge_task_info)
 
-    speedup_task_info: SpeedupTask = {
-        "folder_path": Path(
-            r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample"
-        ),
-        "multiple": 101,
-        "same_encode": False,
+    cut_sl_speedup_task_info: CutSlSpeedupTask = {
+        "folder_path": target_path,
+        "multiple": 3,
+        "same_encode": True,
     }
-    mideo_converter.speedup_handler(**speedup_task_info)
+    mideo_converter.cut_sl_speedup_handler(
+        **(cut_sl_speedup_task_info | {"valid_extensions": {".mp4"}})
+    )
 
 
 if __name__ == "__main__":

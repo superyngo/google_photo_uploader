@@ -4,6 +4,7 @@ from typing import LiteralString, TypedDict, Callable
 from ...utils import logger
 from ...services import ffmpeg_converter
 from pathlib import Path
+import re
 
 
 class HandleSpeedup(TypedDict):
@@ -11,12 +12,18 @@ class HandleSpeedup(TypedDict):
     end_hour: int
 
 
-def extract_epoch(filename: str) -> int | None:
-    """Function to extract epoch time from filename"""
+def extract_epoch(filename: Path | str) -> int | None:
+    """Function to extract the first valid 10-digit epoch time from filename using regex"""
 
     try:
-        return int(filename.split("_")[1].split(".")[0])
-    except (IndexError, ValueError) as e:
+        # Regex pattern to find a sequence of exactly 10 digits
+        match = re.search(r"\b\d{10}\b", str(filename))
+        if match:
+            return int(match.group(0))
+        else:
+            logger.error(f"No valid 10-digit epoch time found in {filename}")
+            return None
+    except ValueError as e:
         logger.error(f"Failed to extract epoch from {filename}: {str(e)}")
         return None
 
@@ -131,8 +138,11 @@ def merge_videos(
             for file in input_files:
                 f.write(f"file '{file}'\n")
 
+        # Get the file's timestamp to the first video's epoch time
+        first_video_epoch = next(iter(sorted_videos))
+
         # Define the output file path
-        output_file: Path = save_path / f"{date_key}.mkv"
+        output_file: Path = save_path / f"{date_key}_{first_video_epoch}.mkv"
         logger.info(f"{output_file = }")
         try:
             # Use ffmpeg to concatenate videos
@@ -146,8 +156,6 @@ def merge_videos(
         # Remove the temporary input file list
         os.remove("input.txt")
 
-        # Set the file's timestamp to the first video's epoch time
-        first_video_epoch = next(iter(sorted_videos))
         os.utime(output_file, (first_video_epoch, first_video_epoch))
 
         # Clean up original video files and directories
@@ -172,11 +180,12 @@ def merge_videos(
     return 0
 
 
-def speedup_videos(
+def cut_sl_speedup(
     input_folder: Path,
     multiple: int | float,
-    output_folder_name: str = "speedup",
     same_encode: bool = True,
+    output_folder_name: str = "cut_sl_speedup",
+    valid_extensions: set[str] = {".mkv"},
     **otherkwargs,
 ):
     """_summary_
@@ -184,29 +193,50 @@ def speedup_videos(
     Args:
         input_folder (Path): _description_
         multiple (int | float): _description_
-        output_folder_name (str, optional): _description_. Defaults to "speedup".
         same_encode (bool, optional): _description_. Defaults to True.
+        output_folder_name (str, optional): _description_. Defaults to "cut_sl_speedup".
 
     Returns:
         _type_: _description_
     """
+
+    cut_sl_config: ffmpeg_converter = {
+        "dB": -30,
+        "sl_duration": 0.2,
+        "seg_min_duration": 3,
+    }
+
     output_folder: Path = input_folder / output_folder_name
     output_folder.mkdir(parents=True, exist_ok=True)
-    mkv_video_files: list[Path] = list_video_files(input_folder, {".mkv"}, False)
+    mkv_video_files: list[Path] = list_video_files(
+        input_folder, valid_extensions, False
+    )
     for video in mkv_video_files:
+        # Get the file's timestamp to the first video's epoch time
+        video_epoch = extract_epoch(video)
+
         if same_encode:
             original_encode: ffmpeg_converter.EncodeKwargs = (
                 ffmpeg_converter.probe_encoding_info(video)
             )
         else:
             original_encode = {}
-        output_file: Path = output_folder / (video.stem + "_speedup" + video.suffix)
+
+        output_file: Path = output_folder / (
+            video.stem + "_" + output_folder_name + video.suffix
+        )
+
+        ffmpeg_converter.cut_silence(video, video, **cut_sl_config)
         ffmpeg_converter.speedup(
             video, output_file, multiple, **(original_encode | otherkwargs)
         )
+
+        os.utime(output_file, (video_epoch, video_epoch))
+
         logger.info(
-            f"Speeding up video saved to {output_file}, set timestamps as the original file."
+            f"Cut silence and speeding up video saved to {output_file}, set timestamps as the original file."
         )
+
     return 0
 
 
@@ -236,8 +266,8 @@ def merger_handler(
     return do_merge
 
 
-def speedup_handler(
-    folder_path: Path, multiple: int | float = 50, **otherkwargs
+def cut_sl_speedup_handler(
+    folder_path: Path, multiple: int | float = 3, **otherkwargs
 ) -> int:
     """_summary_
 
@@ -248,11 +278,11 @@ def speedup_handler(
     Returns:
         int: _description_
     """
-    logger.info(f"Start speeding up videos in {folder_path}")
+    logger.info(f"Start cutting silence and speed up videos in {folder_path}")
 
-    do_speedup: int = speedup_videos(folder_path, multiple, **otherkwargs)
+    do_cut_si_speedup: int = cut_sl_speedup(folder_path, multiple, **otherkwargs)
 
-    return do_speedup
+    return do_cut_si_speedup
 
 
 def main() -> None:
