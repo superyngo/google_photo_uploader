@@ -17,9 +17,9 @@ def extract_epoch(filename: Path | str) -> int | None:
 
     try:
         # Regex pattern to find a sequence of exactly 10 digits
-        match = re.search(r"\b\d{10}\b", str(filename))
-        if match:
-            return int(match.group(0))
+        matches = re.findall(r"\D?(\d{10})\D?", str(Path(filename).stem))
+        if matches:
+            return int(matches[0])
         else:
             logger.error(f"No valid 10-digit epoch time found in {filename}")
             return None
@@ -185,7 +185,7 @@ def cut_sl_speedup(
     multiple: int | float,
     same_encode: bool = True,
     output_folder_name: str = "cut_sl_speedup",
-    valid_extensions: set[str] = {".mkv"},
+    valid_extensions: set[str] = {".mkv", ".mp4"},
     **otherkwargs,
 ):
     """_summary_
@@ -200,7 +200,7 @@ def cut_sl_speedup(
         _type_: _description_
     """
 
-    cut_sl_config: ffmpeg_converter = {
+    cut_sl_config = {
         "dB": -30,
         "sl_duration": 0.2,
         "seg_min_duration": 3,
@@ -226,12 +226,18 @@ def cut_sl_speedup(
             video.stem + "_" + output_folder_name + video.suffix
         )
 
-        ffmpeg_converter.cut_silence(video, video, **cut_sl_config)
+        cut_silence = ffmpeg_converter.cut_silence(video, output_file, **cut_sl_config)
+
+        if cut_silence != 0:
+            logger.error(f"Failed to cut silence for {video}. Skipping.")
+            continue
+
         ffmpeg_converter.speedup(
-            video, output_file, multiple, **(original_encode | otherkwargs)
+            output_file, output_file, multiple, **(original_encode | otherkwargs)
         )
 
-        os.utime(output_file, (video_epoch, video_epoch))
+        if video_epoch:
+            os.utime(output_file, (video_epoch, video_epoch))
 
         logger.info(
             f"Cut silence and speeding up video saved to {output_file}, set timestamps as the original file."

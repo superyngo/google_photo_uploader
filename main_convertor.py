@@ -2,12 +2,11 @@ from app import mideo_converter
 from app import config
 from app.models.tasks import MideoMergerTask, CutSlSpeedupTask
 from pathlib import Path
+from app.services import ffmpeg_converter
 
 
 def main() -> None:
-    target_path: Path = Path(
-        r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample"
-    )
+    target_path: Path = Path(r"H:\data\94f827b4b94e")
     merge_task_info: MideoMergerTask = {
         "folder_path": target_path,
         "start_hour": 6,
@@ -17,12 +16,10 @@ def main() -> None:
 
     cut_sl_speedup_task_info: CutSlSpeedupTask = {
         "folder_path": target_path,
-        "multiple": 3,
+        "multiple": 2.5,
         "same_encode": True,
     }
-    mideo_converter.cut_sl_speedup_handler(
-        **(cut_sl_speedup_task_info | {"valid_extensions": {".mp4"}})
-    )
+    mideo_converter.cut_sl_speedup_handler(**(cut_sl_speedup_task_info))
 
 
 if __name__ == "__main__":

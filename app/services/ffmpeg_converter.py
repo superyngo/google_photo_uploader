@@ -136,12 +136,14 @@ def detect_silence(
 
     # Regular expression to find all floats after silence_duration: "
     silence_duration_pattern = r"silence_duration: ([0-9.]+)"
-    silence_duration_matches: list[float] = re.findall(silence_duration_pattern, output)
+    silence_duration_matches: Generator[float] = (
+        float(s) for s in re.findall(silence_duration_pattern, output)
+    )
 
     total_silence_duration: float = sum(silence_duration_matches)
     total_duration_pattern = r"Duration: (^\d{2}:\d{2}:\d{2}\.\d{1,3}$)"
 
-    return (silence_end_floats, total_silence_duration)
+    return (silence_end_floats, total_silence_duration, 0)
 
 
 def speedup(
@@ -453,6 +455,10 @@ def _ensure_minimum_segment_length(
     Returns:
         list[float]: Updated list of start and end times with adjusted segment durations.
     """
+
+    if video_segments == []:
+        return []
+
     if len(video_segments) % 2 != 0:
         raise ValueError("video_segments must contain pairs of start and end times.")
 
@@ -474,12 +480,12 @@ def _ensure_minimum_segment_length(
             diff = seg_min_duration - duration
             # Adjust the start and end times to increase the duration to the minimum
             start_time = max(0, start_time - diff / 2)
-            end_time = max(start_time + seg_min_duration, video_segments[-1])
+            end_time = min(start_time + seg_min_duration, video_segments[-1])
 
         updated_segments.extend([start_time, end_time])
 
     # Ensure the hole video is long enough
-    if updated_segments[-1] - updated_segments[1] < seg_min_duration:
+    if updated_segments[-1] - updated_segments[0] < seg_min_duration:
         return []
 
     return updated_segments
@@ -539,7 +545,7 @@ def create_video_segments(
             end_time = _convert_seconds_to_time(video_segments[i + 1])
             if start_time == end_time:
                 continue
-            output_path: Path = temp_dir / f"{i // 2}.mp4"
+            output_path: Path = temp_dir / f"{i // 2}.mkv"
             cut_videos.append(output_path)
 
             # Submit the cut task to the executor
@@ -567,12 +573,17 @@ def cut_silence(
     output_file: Path | None = None,
     dB: int = -30,
     sl_duration: float = 0.2,
-    seg_min_duration: float = 3,
+    seg_min_duration: float = 4,
     **othertags: EncodeKwargs,
-) -> int:
+) -> int | Enum:
+    class error_code(Enum):
+        DURATION_LESS_THAN_ZERO = auto()
+        NO_VALID_SEGMENTS = auto()
+        FAILED_TO_CUT = auto()
+
     if sl_duration <= 0:
         logger.error(f"Duration must be greater than 0.")
-        return 1
+        return error_code.DURATION_LESS_THAN_ZERO
 
     if output_file is None:
         output_file = input_file.parent / (
@@ -586,11 +597,12 @@ def cut_silence(
     )
 
     silences_segment: Sequence[float] = detect_silence(input_file, dB, sl_duration)[0]
-    updated_segments = _merge_overlapping_segments(
+    updated_segments: Sequence[float] = _merge_overlapping_segments(
         _ensure_minimum_segment_length(silences_segment, seg_min_duration)
     )
     if updated_segments == []:
-        pass
+        logger.error(f"No valid segments found for {input_file}.")
+        return error_code.NO_VALID_SEGMENTS
 
     videos_segments: Sequence[Path]
     input_txt_path: Path
@@ -608,5 +620,5 @@ def cut_silence(
         os.rmdir(input_txt_path.parent)
     except ffmpeg.Error as e:
         logger.error(f"Failed to cut silence for {input_file}. Error: {e.stderr}")
-        return 2
+        return error_code.FAILED_TO_CUT
     return 0
