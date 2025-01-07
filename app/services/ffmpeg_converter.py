@@ -18,26 +18,19 @@ class methods(StrEnum):
     SPEEDUP = auto()
     JUMPCUT = auto()
     CONVERT = auto()
-    CUT_SILENCE = auto()
     CUT = auto()
     MERGE = auto()
     PROBE_ENCODING_INFO = auto()
+    PROBE_DURATION = auto()
     IS_VALID_VIDEO = auto()
+    DETECT_NON_SILENCE = auto()
+    CUT_SILENCE = auto()
+    CUT_SILENCE_RENDER = auto()
+    ENCODEKWARGS = auto()
+    ffmpeg_Error = auto()
 
 
-__ALL__: list[str] = [
-    "probe_duration",
-    "probe_encoding_info",
-    "detect_silence",
-    "speedup",
-    "jumpcut",
-    "convert",
-    "merge",
-    "cut",
-    "cut_silence",
-    "cut_silence_render",
-    "EncodeKwargs",
-]
+__ALL__: list[str] = [method.value for method in methods]
 
 
 class EncodeKwargs(TypedDict):
@@ -108,7 +101,7 @@ def probe_encoding_info(file_path: Path) -> EncodeKwargs:
     return cleaned_None
 
 
-def detect_silence(
+def detect_non_silence(
     file_path: Path, dB: int = -35, sl_duration: float = 1
 ) -> tuple[Sequence[float], float, float]:
     logger.info(f"Detecting silences in {file_path.name} with {dB = }")
@@ -119,31 +112,34 @@ def detect_silence(
         .run(capture_stdout=True, capture_stderr=True)
     )[1].decode("utf-8")
 
-    # Regular expression to find all floats after "silence_start or end: "
-    silence_seg_pattern = r"silence_(?:start|end): ([0-9.]+)"
-
-    # Find all matches in the log data
-    silence_seg_matches: list[float] = re.findall(silence_seg_pattern, output)
-
-    # Convert matches to a list of floats
-    silence_end_floats: deque[float] = deque(
-        float(match) for match in silence_seg_matches
+    # Total duration
+    total_duration_pattern = r"Duration: (.+?),"
+    total_duration_match: str | None = re.findall(total_duration_pattern, output)[0]
+    total_duration: float = _convert_timestamp_to_seconds(
+        total_duration_match if total_duration_match else "0.0"
     )
 
-    # Handle silence start and end
-    silence_end_floats.appendleft(0.0)
-    silence_end_floats.append(float(probe_duration(file_path)))
+    # Regular expression to find all floats after "silence_start or end: "
+    silence_seg_pattern = r"silence_(?:start|end): ([0-9.]+)"
+    # Find all matches in the log data
+    silence_seg_matches: list[str] = re.findall(silence_seg_pattern, output)
+    # Convert matches to a list of floats
+    non_silence_segs: deque[float] = deque(
+        float(match) for match in silence_seg_matches
+    )
+    # Handle silence start and end to represent non silence
+    non_silence_segs.appendleft(0.0)
+    non_silence_segs.append(total_duration)
 
     # Regular expression to find all floats after silence_duration: "
     silence_duration_pattern = r"silence_duration: ([0-9.]+)"
+    silence_duration_maches: list[str] = re.findall(silence_duration_pattern, output)
     silence_duration_matches: Generator[float] = (
-        float(s) for s in re.findall(silence_duration_pattern, output)
+        float(s) for s in silence_duration_maches
     )
-
     total_silence_duration: float = sum(silence_duration_matches)
-    total_duration_pattern = r"Duration: (^\d{2}:\d{2}:\d{2}\.\d{1,3}$)"
 
-    return (silence_end_floats, total_silence_duration, 0)
+    return (non_silence_segs, total_silence_duration, total_duration)
 
 
 def speedup(
@@ -152,6 +148,14 @@ def speedup(
     multiple: float | int,
     **othertags,
 ) -> int:
+    if multiple == 1:
+        logger.info(f"Skipping {methods.SPEEDUP} for {input_file} as {multiple = }")
+        return 1
+
+    if multiple <= 0:
+        logger.error(f"Speedup factor must be greater than 0.")
+        return 2
+
     SPEEDUP_METHOD_THRSHOLD: int = 4
 
     if output_file is None:
@@ -180,11 +184,11 @@ def speedup(
         }
         | othertags
     )
+
     logger.info(
         f"{methods.SPEEDUP} {input_file} to {output_file} with speed {multiple} and {output_kwargs = }"
     )
-    try:
-        # Speedup the video using ffmpeg-python
+    try:  # Speedup the video using ffmpeg-python
         do = (
             ffmpeg.input(input_file)
             .output(
@@ -366,70 +370,7 @@ def _create_cut_sl_filter_tempfile(
     return path
 
 
-def cut_silence_render(
-    input_file: Path,
-    output_file: Path | None = None,
-    dB: int = -30,
-    sl_duration: float = 0.2,
-    **othertags: EncodeKwargs,
-) -> int:
-    if sl_duration <= 0:
-        logger.error(f"Duration must be greater than 0.")
-        return 1
-
-    if output_file is None:
-        output_file = input_file.parent / (
-            input_file.name + "_" + methods.CUT_SILENCE + input_file.suffix
-        )
-    temp_output_file: Path = output_file.parent / (
-        output_file.stem + "_processing" + output_file.suffix
-    )
-    logger.info(
-        f"{methods.CUT_SILENCE} {input_file} to {output_file} with {dB = } ,{sl_duration = } and {othertags = }"
-    )
-
-    silences_segment: Sequence[float] = detect_silence(input_file, dB, sl_duration)[0]
-
-    class CSFiltersInfo(Enum):
-        VIDEO = [
-            "select='",
-            "', setpts=N/FRAME_RATE/TB",
-            f"temp_{time.strftime("%Y%m%d-%H%M%S")}_video_filter_",
-        ]
-        AUDIO = [
-            "aselect='",
-            "', asetpts=N/SR/TB",
-            f"temp_{time.strftime("%Y%m%d-%H%M%S")}_audio_filter_",
-        ]
-
-    video_filter_script: Path = _create_cut_sl_filter_tempfile(
-        CSFiltersInfo.VIDEO.value, silences_segment
-    )
-    audio_filter_script: Path = _create_cut_sl_filter_tempfile(
-        CSFiltersInfo.AUDIO.value, silences_segment
-    )
-
-    output_kwargs = {
-        "filter_script:v": video_filter_script,
-        "filter_script:a": audio_filter_script,
-    } | othertags
-
-    try:
-        (
-            ffmpeg.input(str(input_file))
-            .output(str(temp_output_file), **output_kwargs)
-            .run()
-        )
-        os.remove(video_filter_script)
-        os.remove(audio_filter_script)
-        temp_output_file.replace(output_file)
-    except ffmpeg.Error as e:
-        logger.error(f"Failed to cut silence for {input_file}. Error: {e.stderr}")
-        return 2
-    return 0
-
-
-def _convert_seconds_to_time(seconds: float) -> str:
+def _convert_seconds_to_timestamp(seconds: float) -> str:
     """Converts seconds to HH:MM:SS format."""
     # Convert seconds to hours, minutes, and seconds
     hours, remainder = divmod(int(seconds), 3600)
@@ -437,6 +378,20 @@ def _convert_seconds_to_time(seconds: float) -> str:
     milliseconds = int((seconds - int(seconds)) * 1000)
     timestamp = f"{hours:02}:{minutes:02}:{secs:02}.{milliseconds:03}"
     return timestamp
+
+
+def _convert_timestamp_to_seconds(timestamp: str) -> float:
+    # Split the timestamp into its components
+    parts = timestamp.split(":")
+
+    # Convert each part to a float and calculate the total seconds
+    hours = float(parts[0])
+    minutes = float(parts[1])
+    seconds = float(parts[2])
+
+    # Calculate total seconds
+    total_seconds = hours * 3600 + minutes * 60 + seconds
+    return total_seconds
 
 
 def _ensure_minimum_segment_length(
@@ -517,7 +472,7 @@ def _merge_overlapping_segments(segments: Sequence[float]) -> Sequence[float]:
     return merged_segments
 
 
-def create_video_segments(
+def _create_video_segments(
     input_video: Path, video_segments: Sequence[float]
 ) -> tuple[Sequence[Path], Path]:
     """
@@ -541,11 +496,11 @@ def create_video_segments(
     with concurrent.futures.ThreadPoolExecutor(max_workers=num_cores) as executor:
         futures = []
         for i in range(0, len(video_segments), 2):
-            start_time = _convert_seconds_to_time(video_segments[i])
-            end_time = _convert_seconds_to_time(video_segments[i + 1])
+            start_time = _convert_seconds_to_timestamp(video_segments[i])
+            end_time = _convert_seconds_to_timestamp(video_segments[i + 1])
             if start_time == end_time:
                 continue
-            output_path: Path = temp_dir / f"{i // 2}.mkv"
+            output_path: Path = temp_dir / f"{i // 2}{input_video.suffix}"
             cut_videos.append(output_path)
 
             # Submit the cut task to the executor
@@ -573,7 +528,7 @@ def cut_silence(
     output_file: Path | None = None,
     dB: int = -30,
     sl_duration: float = 0.2,
-    seg_min_duration: float = 4,
+    seg_min_duration: float = 5,
     **othertags: EncodeKwargs,
 ) -> int | Enum:
     class error_code(Enum):
@@ -596,9 +551,11 @@ def cut_silence(
         f"{methods.CUT_SILENCE} {input_file} to {output_file} with {dB = } ,{sl_duration = }, {seg_min_duration = } and {othertags = }"
     )
 
-    silences_segment: Sequence[float] = detect_silence(input_file, dB, sl_duration)[0]
+    non_silence_segments: Sequence[float] = detect_non_silence(
+        input_file, dB, sl_duration
+    )[0]
     updated_segments: Sequence[float] = _merge_overlapping_segments(
-        _ensure_minimum_segment_length(silences_segment, seg_min_duration)
+        _ensure_minimum_segment_length(non_silence_segments, seg_min_duration)
     )
     if updated_segments == []:
         logger.error(f"No valid segments found for {input_file}.")
@@ -606,10 +563,10 @@ def cut_silence(
 
     videos_segments: Sequence[Path]
     input_txt_path: Path
-
-    videos_segments, input_txt_path = create_video_segments(
+    videos_segments, input_txt_path = _create_video_segments(
         input_file, updated_segments
     )
+
     try:
         merge(input_txt_path, temp_output_file)
         temp_output_file.replace(output_file)
@@ -621,4 +578,69 @@ def cut_silence(
     except ffmpeg.Error as e:
         logger.error(f"Failed to cut silence for {input_file}. Error: {e.stderr}")
         return error_code.FAILED_TO_CUT
+    return 0
+
+
+def cut_silence_rerender(
+    input_file: Path,
+    output_file: Path | None = None,
+    dB: int = -30,
+    sl_duration: float = 0.2,
+    **othertags: EncodeKwargs,
+) -> int:
+    if sl_duration <= 0:
+        logger.error(f"Duration must be greater than 0.")
+        return 1
+
+    if output_file is None:
+        output_file = input_file.parent / (
+            input_file.name + "_" + methods.CUT_SILENCE + input_file.suffix
+        )
+    temp_output_file: Path = output_file.parent / (
+        output_file.stem + "_processing" + output_file.suffix
+    )
+    logger.info(
+        f"{methods.CUT_SILENCE} {input_file} to {output_file} with {dB = } ,{sl_duration = } and {othertags = }"
+    )
+
+    non_silence_segments: Sequence[float] = detect_non_silence(
+        input_file, dB, sl_duration
+    )[0]
+
+    class CSFiltersInfo(Enum):
+        VIDEO = [
+            "select='",
+            "', setpts=N/FRAME_RATE/TB",
+            f"temp_{time.strftime("%Y%m%d-%H%M%S")}_video_filter_",
+        ]
+        AUDIO = [
+            "aselect='",
+            "', asetpts=N/SR/TB",
+            f"temp_{time.strftime("%Y%m%d-%H%M%S")}_audio_filter_",
+        ]
+
+    video_filter_script: Path = _create_cut_sl_filter_tempfile(
+        CSFiltersInfo.VIDEO.value, non_silence_segments
+    )
+    audio_filter_script: Path = _create_cut_sl_filter_tempfile(
+        CSFiltersInfo.AUDIO.value, non_silence_segments
+    )
+
+    output_kwargs = {
+        "filter_script:v": video_filter_script,
+        "filter_script:a": audio_filter_script,
+    } | othertags
+
+    try:
+        (
+            ffmpeg.input(str(input_file))
+            .output(str(temp_output_file), **output_kwargs)
+            .run()
+        )
+        os.remove(video_filter_script)
+        os.remove(audio_filter_script)
+        temp_output_file.replace(output_file)
+    except ffmpeg.Error as e:
+        logger.error(f"Failed to cut silence for {input_file}. Error: {e.stderr}")
+        return 2
     return 0

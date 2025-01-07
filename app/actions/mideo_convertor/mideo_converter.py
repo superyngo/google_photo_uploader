@@ -6,13 +6,15 @@ from ...services import ffmpeg_converter
 from pathlib import Path
 import re
 
+__ALL__ = ["merger_handler", "cut_sl_speedup_handler"]
+
 
 class HandleSpeedup(TypedDict):
     start_hour: int
     end_hour: int
 
 
-def extract_epoch(filename: Path | str) -> int | None:
+def _extract_epoch(filename: Path | str) -> int | None:
     """Function to extract the first valid 10-digit epoch time from filename using regex"""
 
     try:
@@ -28,7 +30,7 @@ def extract_epoch(filename: Path | str) -> int | None:
         return None
 
 
-def list_video_files(
+def _list_video_files(
     root_path: str | Path,
     valid_extensions: set[str] | None = None,
     walkthrough: bool = True,
@@ -73,12 +75,12 @@ def list_video_files(
 type GroupedVideos = dict[date, dict[int, Path]]
 
 
-def group_files_by_date(video_files: list[Path], start_hour: int = 0) -> GroupedVideos:
+def _group_files_by_date(video_files: list[Path], start_hour: int = 0) -> GroupedVideos:
     grouped_files: GroupedVideos = {}
 
     for video_path in video_files:
         filename: str = os.path.basename(video_path)
-        epoch_time: int | None = extract_epoch(filename)
+        epoch_time: int | None = _extract_epoch(filename)
         date_key: str | date
 
         if epoch_time is None:
@@ -97,7 +99,7 @@ def group_files_by_date(video_files: list[Path], start_hour: int = 0) -> Grouped
     return grouped_files
 
 
-def merge_videos(
+def _merge_videos(
     video_dict: GroupedVideos, save_path: Path, delete_after: bool, **otherkwargs
 ) -> int:
     """_summary_
@@ -180,7 +182,33 @@ def merge_videos(
     return 0
 
 
-def cut_sl_speedup(
+def merger_handler(
+    folder_path: Path, start_hour: int = 6, delete_after: bool = True, **otherkwargs
+) -> int:
+    """_summary_
+
+    Args:
+        folder_path (Path): _description_
+        start_hour (int, optional): _description_. Defaults to 6.
+        delete_after (bool, optional): _description_. Defaults to True.
+
+    Returns:
+        int: _description_
+    """
+    logger.info(f"Start merging videos in {folder_path}")
+
+    video_files: list[Path] = _list_video_files(folder_path)
+
+    grouped_videos: GroupedVideos = _group_files_by_date(video_files, start_hour)
+
+    do_merge: int = _merge_videos(
+        grouped_videos, folder_path, delete_after, **otherkwargs
+    )
+
+    return do_merge
+
+
+def _cut_sl_speedup(
     input_folder: Path,
     multiple: int | float,
     same_encode: bool = True,
@@ -203,17 +231,17 @@ def cut_sl_speedup(
     cut_sl_config = {
         "dB": -30,
         "sl_duration": 0.2,
-        "seg_min_duration": 3,
+        "seg_min_duration": 5,
     }
 
     output_folder: Path = input_folder / output_folder_name
     output_folder.mkdir(parents=True, exist_ok=True)
-    mkv_video_files: list[Path] = list_video_files(
+    mkv_video_files: list[Path] = _list_video_files(
         input_folder, valid_extensions, False
     )
     for video in mkv_video_files:
         # Get the file's timestamp to the first video's epoch time
-        video_epoch = extract_epoch(video)
+        video_epoch = _extract_epoch(video)
 
         if same_encode:
             original_encode: ffmpeg_converter.EncodeKwargs = (
@@ -232,44 +260,22 @@ def cut_sl_speedup(
             logger.error(f"Failed to cut silence for {video}. Skipping.")
             continue
 
-        ffmpeg_converter.speedup(
-            output_file, output_file, multiple, **(original_encode | otherkwargs)
-        )
+        if multiple != 0 or multiple != 1:
+            ffmpeg_converter.speedup(
+                output_file, output_file, multiple, **(original_encode | otherkwargs)
+            )
 
-        if video_epoch:
-            os.utime(output_file, (video_epoch, video_epoch))
+        else:
+            logger.info(f"{multiple = } for {video}. Skipping.")
 
-        logger.info(
-            f"Cut silence and speeding up video saved to {output_file}, set timestamps as the original file."
-        )
+            if video_epoch:
+                os.utime(output_file, (video_epoch, video_epoch))
+
+            logger.info(
+                f"Cut silence and speeding up video saved to {output_file}, set timestamps as the original file."
+            )
 
     return 0
-
-
-def merger_handler(
-    folder_path: Path, start_hour: int = 6, delete_after: bool = True, **otherkwargs
-) -> int:
-    """_summary_
-
-    Args:
-        folder_path (Path): _description_
-        start_hour (int, optional): _description_. Defaults to 6.
-        delete_after (bool, optional): _description_. Defaults to True.
-
-    Returns:
-        int: _description_
-    """
-    logger.info(f"Start merging videos in {folder_path}")
-
-    video_files: list[Path] = list_video_files(folder_path)
-
-    grouped_videos: GroupedVideos = group_files_by_date(video_files, start_hour)
-
-    do_merge: int = merge_videos(
-        grouped_videos, folder_path, delete_after, **otherkwargs
-    )
-
-    return do_merge
 
 
 def cut_sl_speedup_handler(
@@ -286,22 +292,13 @@ def cut_sl_speedup_handler(
     """
     logger.info(f"Start cutting silence and speed up videos in {folder_path}")
 
-    do_cut_si_speedup: int = cut_sl_speedup(folder_path, multiple, **otherkwargs)
+    do_cut_si_speedup: int = _cut_sl_speedup(folder_path, multiple, **otherkwargs)
 
     return do_cut_si_speedup
 
 
 def main() -> None:
-    """_summary_"""
-    handle_speedup: HandleSpeedup = {"start_hour": 23, "end_hour": 5}
-
-    base_path: Path = Path("H:", "data", "94f827b4b94e")
-
-    video_files: list[Path] = list_video_files(base_path)
-
-    grouped_videos: GroupedVideos = group_files_by_date(video_files, 5)
-
-    do_merge: int = merge_videos(grouped_videos, base_path, handle_speedup)
+    pass
 
 
 if __name__ == "__main__":
