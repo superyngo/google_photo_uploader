@@ -19,7 +19,7 @@ _instances: dict[Path, Logger] = {}
 def setup_logger(log_path: Path | None = None) -> Logger:
 
     # Ensure the log directory exists in the executing root
-    log_directory: Path = log_path or Path.cwd() / "log"
+    log_directory: Path = log_path or Path.cwd() / "Logs"
     log_directory.mkdir(parents=True, exist_ok=True)
     if log_path in _instances:
         return _instances[log_directory]

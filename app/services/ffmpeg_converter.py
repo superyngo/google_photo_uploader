@@ -139,7 +139,23 @@ def detect_non_silence(
     )
     total_silence_duration: float = sum(silence_duration_matches)
 
-    return (non_silence_segs, total_silence_duration, total_duration)
+    return (non_silence_segs, total_duration, total_silence_duration)
+
+
+def _get_keyframe_time(file_path: Path) -> list[float]:
+    logger.info(f"Get keyframe timeing for {file_path.name}")
+    probe = ffmpeg.probe(
+        str(file_path),
+        loglevel="error",
+        select_streams="v:0",
+        show_entries="packet=pts_time,flags",
+    )
+    keyframe_pts: list[float] = [
+        float(packet["pts_time"])
+        for packet in probe["packets"]
+        if "K" in packet["flags"]
+    ]
+    return keyframe_pts
 
 
 def speedup(
@@ -148,30 +164,46 @@ def speedup(
     multiple: float | int,
     **othertags,
 ) -> int:
-    if multiple == 1:
-        logger.info(f"Skipping {methods.SPEEDUP} for {input_file} as {multiple = }")
-        return 1
+    """_summary_
 
+    Args:
+        input_file (Path): _description_
+        output_file (Path | None): _description_
+        multiple (float | int): _description_
+
+    Raises:
+        e: _description_
+
+    Returns:
+        int: _description_
+    """
     if multiple <= 0:
         logger.error(f"Speedup factor must be greater than 0.")
-        return 2
-
-    SPEEDUP_METHOD_THRSHOLD: int = 4
+        return 1
 
     if output_file is None:
         output_file = input_file.parent / (
             input_file.name + "_" + methods.SPEEDUP + input_file.suffix
         )
+
+    if multiple == 1:
+        if input_file != output_file:
+            input_file.replace(output_file)
+        logger.error(f"Speedup factor 1, only replace target file")
+        return 0
+
     temp_output_file: Path = output_file.parent / (
         output_file.stem + "_processing" + output_file.suffix
     )
+
+    SPEEDUP_METHOD_THRSHOLD: int = 4
     output_kwargs: dict = (
         (
             {  # sepped up with select
                 "vf": f"select='not(mod(n,{multiple}))',setpts=N/FRAME_RATE/TB",
                 "af": f"aselect='not(mod(n,{multiple}))',asetpts=N/SR/TB",
             }
-            if multiple > SPEEDUP_METHOD_THRSHOLD
+            if multiple > SPEEDUP_METHOD_THRSHOLD  # Decide speed up method
             else {  # speed up with setpts and atempo
                 "vf": f"setpts={1/multiple}*PTS",
                 "af": f"atempo={multiple}",
@@ -357,19 +389,6 @@ def cut(
     return 0
 
 
-def _create_cut_sl_filter_tempfile(
-    filter_info: Sequence[str],
-    videoSectionTimings: Sequence[float],
-) -> Path:
-    with tempfile.NamedTemporaryFile(
-        delete=False, mode="w", encoding="UTF-8", prefix=filter_info[2]
-    ) as temp_file:
-        for line in _gen_filter(filter_info, videoSectionTimings):
-            temp_file.write(f"{line}\n")
-        path: Path = Path(temp_file.name)
-    return path
-
-
 def _convert_seconds_to_timestamp(seconds: float) -> str:
     """Converts seconds to HH:MM:SS format."""
     # Convert seconds to hours, minutes, and seconds
@@ -394,9 +413,46 @@ def _convert_timestamp_to_seconds(timestamp: str) -> float:
     return total_seconds
 
 
+def _adjust_segments_to_keyframes(
+    video_segments: Sequence[float], keyframe_times: Sequence[float]
+) -> Sequence[float]:
+    adjusted_segments = []
+    keyframe_index = 0
+
+    for i, time in enumerate(video_segments):
+        if i % 2 == 0:  # start time
+            # 找到不大於當前時間的最大關鍵幀時間
+            while (
+                keyframe_index < len(keyframe_times)
+                and keyframe_times[keyframe_index] <= time
+            ):
+                keyframe_index += 1
+            adjusted_time = (
+                keyframe_times[keyframe_index - 1] if keyframe_index > 0 else time
+            )
+            adjusted_segments.append(adjusted_time)
+        else:  # end time
+            # 找到不小於當前時間的最小關鍵幀時間
+            while (
+                keyframe_index < len(keyframe_times)
+                and keyframe_times[keyframe_index] < time
+            ):
+                keyframe_index += 1
+            adjusted_time = (
+                keyframe_times[keyframe_index]
+                if keyframe_index < len(keyframe_times)
+                else time
+            )
+            adjusted_segments.append(adjusted_time)
+
+    return adjusted_segments
+
+
 def _ensure_minimum_segment_length(
-    video_segments: Sequence[float], seg_min_duration: float = 2
-) -> list[float]:
+    video_segments: Sequence[float],
+    seg_min_duration: float = 1,
+    total_duration: float | None = None,
+) -> Sequence[float]:
     """
     Ensures that every segment in the video_segments list is at least seg_min_duration seconds long.
 
@@ -410,12 +466,19 @@ def _ensure_minimum_segment_length(
     Returns:
         list[float]: Updated list of start and end times with adjusted segment durations.
     """
+    if seg_min_duration == 0 or video_segments == []:
+        return video_segments
 
-    if video_segments == []:
-        return []
+    if seg_min_duration < 0:
+        raise ValueError(
+            f"seg_min_duration must greater than 0 but got {seg_min_duration}."
+        )
 
     if len(video_segments) % 2 != 0:
         raise ValueError("video_segments must contain pairs of start and end times.")
+
+    if total_duration is None:
+        total_duration = video_segments[-1]
 
     updated_segments = []
     for i in range(0, len(video_segments), 2):
@@ -435,7 +498,7 @@ def _ensure_minimum_segment_length(
             diff = seg_min_duration - duration
             # Adjust the start and end times to increase the duration to the minimum
             start_time = max(0, start_time - diff / 2)
-            end_time = min(start_time + seg_min_duration, video_segments[-1])
+            end_time = min(start_time + seg_min_duration, total_duration)
 
         updated_segments.extend([start_time, end_time])
 
@@ -447,6 +510,14 @@ def _ensure_minimum_segment_length(
 
 
 def _merge_overlapping_segments(segments: Sequence[float]) -> Sequence[float]:
+    """_summary_
+
+    Args:
+        segments (Sequence[float]): _description_
+
+    Returns:
+        Sequence[float]: _description_
+    """
     # Sort segments by start time
     sorted_segments = sorted(
         (segments[i], segments[i + 1]) for i in range(0, len(segments), 2)
@@ -526,10 +597,9 @@ def _create_video_segments(
 def cut_silence(
     input_file: Path,
     output_file: Path | None = None,
-    dB: int = -30,
+    dB: int = -35,
     sl_duration: float = 0.2,
-    seg_min_duration: float = 5,
-    **othertags: EncodeKwargs,
+    seg_min_duration: float = 0,
 ) -> int | Enum:
     class error_code(Enum):
         DURATION_LESS_THAN_ZERO = auto()
@@ -548,23 +618,33 @@ def cut_silence(
         output_file.stem + "_processing" + output_file.suffix
     )
     logger.info(
-        f"{methods.CUT_SILENCE} {input_file} to {output_file} with {dB = } ,{sl_duration = }, {seg_min_duration = } and {othertags = }"
+        f"{methods.CUT_SILENCE} {input_file} to {output_file} with {dB = } ,{sl_duration = }, {seg_min_duration = }."
     )
 
-    non_silence_segments: Sequence[float] = detect_non_silence(
+    non_silence_segments: Sequence[float]
+    total_duration: float
+    non_silence_segments, total_duration, _ = detect_non_silence(
         input_file, dB, sl_duration
-    )[0]
-    updated_segments: Sequence[float] = _merge_overlapping_segments(
-        _ensure_minimum_segment_length(non_silence_segments, seg_min_duration)
     )
-    if updated_segments == []:
+
+    adjust_keyframes: Sequence[float] = _adjust_segments_to_keyframes(
+        _ensure_minimum_segment_length(
+            non_silence_segments, seg_min_duration, total_duration
+        ),
+        _get_keyframe_time(input_file),
+    )
+
+    merged_overlapping_segments: Sequence[float] = _merge_overlapping_segments(
+        adjust_keyframes
+    )
+    if merged_overlapping_segments == []:
         logger.error(f"No valid segments found for {input_file}.")
         return error_code.NO_VALID_SEGMENTS
 
     videos_segments: Sequence[Path]
     input_txt_path: Path
     videos_segments, input_txt_path = _create_video_segments(
-        input_file, updated_segments
+        input_file, merged_overlapping_segments
     )
 
     try:
@@ -579,6 +659,19 @@ def cut_silence(
         logger.error(f"Failed to cut silence for {input_file}. Error: {e.stderr}")
         return error_code.FAILED_TO_CUT
     return 0
+
+
+def _create_cut_sl_filter_tempfile(
+    filter_info: Sequence[str],
+    videoSectionTimings: Sequence[float],
+) -> Path:
+    with tempfile.NamedTemporaryFile(
+        delete=False, mode="w", encoding="UTF-8", prefix=filter_info[2]
+    ) as temp_file:
+        for line in _gen_filter(filter_info, videoSectionTimings):
+            temp_file.write(f"{line}\n")
+        path: Path = Path(temp_file.name)
+    return path
 
 
 def cut_silence_rerender(

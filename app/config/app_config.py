@@ -13,25 +13,17 @@ APP_NAME: LiteralString = "MideoToGPhoto"
 
 
 class Actions(StrEnum):
-    CONVERTOR: str = "mideo_converter"
-    SPEEDUP: str = "speedup"
-    UPLOADER: str = "GPhoto_upload"
-
-
-class AppPaths(PathEnum):
-    PROGRAM_DATA: Path = Path(os.environ["APPDATA"]) / APP_NAME
-    APP_DATA: Path = PROGRAM_DATA / "config.conf"
-    CONFIG: Path = Path(os.environ["PROGRAMDATA"]) / APP_NAME
-    LOGS: Path = APP_DATA / "Logs"
+    CONVERTOR = auto()
+    SPEEDUP = auto()
+    UPLOADER = auto()
 
 
 # set app base path
-APP_PATHS = {
-    "program_data": (program_data := Path(os.environ["APPDATA"]) / APP_NAME),
-    "config": program_data / "config.conf",
-    "app_data": (app_data := Path(os.environ["PROGRAMDATA"]) / APP_NAME),
-    "logs": app_data / "Logs",
-}
+class AppPaths(PathEnum):
+    PROGRAM_DATA = Path(os.environ["APPDATA"]) / APP_NAME
+    APP_DATA = Path(os.environ["PROGRAMDATA"]) / APP_NAME
+    CONFIG = PROGRAM_DATA / "config.conf"
+    LOGS = APP_DATA / "Logs"
 
 
 # set converter

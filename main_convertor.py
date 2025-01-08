@@ -6,7 +6,7 @@ from pathlib import Path
 
 def main() -> None:
     target_path: Path = Path(
-        r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\tt"
+        r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample"
     )
     merge_task_info: MideoMergerTask = {
         "folder_path": target_path,
@@ -17,7 +17,7 @@ def main() -> None:
 
     cut_sl_speedup_task_info: CutSlSpeedupTask = {
         "folder_path": target_path,
-        "multiple": 2,
+        "multiple": 0,
         "same_encode": False,
     }
     mideo_converter.cut_sl_speedup_handler(**(cut_sl_speedup_task_info))

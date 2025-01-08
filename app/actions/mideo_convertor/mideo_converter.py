@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta, date
-from typing import LiteralString, TypedDict, Callable
+from typing import LiteralString, TypedDict, Callable, NotRequired
 from ...utils import logger
 from ...services import ffmpeg_converter
 from pathlib import Path
@@ -208,12 +208,19 @@ def merger_handler(
     return do_merge
 
 
+class CutSlConfig(TypedDict):
+    dB: NotRequired[int]
+    sl_duration: NotRequired[float]
+    seg_min_duration: NotRequired[float]
+
+
 def _cut_sl_speedup(
     input_folder: Path,
     multiple: int | float,
     same_encode: bool = True,
     output_folder_name: str = "cut_sl_speedup",
     valid_extensions: set[str] = {".mkv", ".mp4"},
+    cut_sl_config: CutSlConfig | None = None,
     **otherkwargs,
 ):
     """_summary_
@@ -228,11 +235,8 @@ def _cut_sl_speedup(
         _type_: _description_
     """
 
-    cut_sl_config = {
-        "dB": -30,
-        "sl_duration": 0.2,
-        "seg_min_duration": 5,
-    }
+    if cut_sl_config is None:
+        cut_sl_config = {}
 
     output_folder: Path = input_folder / output_folder_name
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -260,26 +264,25 @@ def _cut_sl_speedup(
             logger.error(f"Failed to cut silence for {video}. Skipping.")
             continue
 
-        if multiple != 0 or multiple != 1:
+        if multiple != 0:
             ffmpeg_converter.speedup(
                 output_file, output_file, multiple, **(original_encode | otherkwargs)
             )
-
         else:
-            logger.info(f"{multiple = } for {video}. Skipping.")
+            logger.info(f"{multiple = } for {video}. No sppedup.")
 
-            if video_epoch:
-                os.utime(output_file, (video_epoch, video_epoch))
+        if video_epoch:
+            os.utime(output_file, (video_epoch, video_epoch))
 
-            logger.info(
-                f"Cut silence and speeding up video saved to {output_file}, set timestamps as the original file."
-            )
+        logger.info(
+            f"Cut silence and speeding up video saved to {output_file}, set timestamps as the original file."
+        )
 
     return 0
 
 
 def cut_sl_speedup_handler(
-    folder_path: Path, multiple: int | float = 3, **otherkwargs
+    folder_path: Path, multiple: int | float = 2, **otherkwargs
 ) -> int:
     """_summary_
 
@@ -292,7 +295,14 @@ def cut_sl_speedup_handler(
     """
     logger.info(f"Start cutting silence and speed up videos in {folder_path}")
 
-    do_cut_si_speedup: int = _cut_sl_speedup(folder_path, multiple, **otherkwargs)
+    cut_sl_config: CutSlConfig = {
+        "dB": -25,
+        "sl_duration": 0.1,
+        "seg_min_duration": 1,
+    }
+    do_cut_si_speedup: int = _cut_sl_speedup(
+        folder_path, multiple, cut_sl_config=cut_sl_config, **otherkwargs
+    )
 
     return do_cut_si_speedup
 

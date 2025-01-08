@@ -13,7 +13,8 @@ class MyDriverConfig(TypedDict):
     browser_executable_path: NotRequired[Path]
 
 
-async def restart(self) -> None:
+# Restrart not working yet
+async def _restart(self) -> None:
     await self.stop()
     browser_config = {
         k: v

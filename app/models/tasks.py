@@ -40,13 +40,6 @@ class CutSlSpeedupTask(TypedDict):
     same_encode: NotRequired[bool]
 
 
-# SpeedupTask
-class CutSlSpeedupTask(TypedDict):
-    folder_path: Path
-    multiple: int | float
-    same_encode: NotRequired[bool]
-
-
 class UploaderTask(TypedDict):
     name: str
     local_album_path: Path

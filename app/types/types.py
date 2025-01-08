@@ -1,8 +1,8 @@
-from enum import Enum
+from enum import Enum, ReprEnum
 from pathlib import Path
 
 
-class PathEnum(Path, Enum):
+class PathEnum(Path, ReprEnum):
     """
     Enum where members are also (and must be) Path objects
     """
@@ -24,6 +24,12 @@ class PathEnum(Path, Enum):
         Return the lower-cased version of the member name.
         """
         return name.lower()
+
+    def __getattr__(self, name):
+        """
+        Directly refer to the attribute's value.
+        """
+        return getattr(self._value_, name)
 
 
 __all__: list[str] = ["PathEnum"]

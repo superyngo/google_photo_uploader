@@ -7,20 +7,12 @@ from app.services import ffmpeg_converter
 import ffmpeg
 
 
-file_path = Path(
-    r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\output_1735874716.mp4"
-)
+file_path = Path(r"C:\Users\user\Downloads\2025-01-07_1736200862.mp4")
 file_path = Path(
     r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\IMG_1117_1735874716.mp4"
 )
 
-output = (
-    ffmpeg.input(str(file_path))
-    .output("null", af=f"silencedetect=n=-30dB:d=0.2", f="null")
-    .run(capture_stdout=True, capture_stderr=True)
-)[1].decode("utf-8")
-
-output = ffmpeg_converter.detect_non_silence(file_path, -20)
+ffmpeg_converter.cut_silence(file_path, None, -25, 0.2, 2)
 
 
 class MyIter:
