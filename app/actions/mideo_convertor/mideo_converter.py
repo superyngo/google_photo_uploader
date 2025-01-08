@@ -298,7 +298,7 @@ def cut_sl_speedup_handler(
     cut_sl_config: CutSlConfig = {
         "dB": -25,
         "sl_duration": 0.1,
-        "seg_min_duration": 1,
+        "seg_min_duration": 0,
     }
     do_cut_si_speedup: int = _cut_sl_speedup(
         folder_path, multiple, cut_sl_config=cut_sl_config, **otherkwargs
