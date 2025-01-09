@@ -8,7 +8,7 @@ class PathEnum(Path, ReprEnum):
     """
 
     def __new__(cls, *values):
-        "values must already be of type `Path` or `str`"
+        # values must already be of type `Path` or `str`
         if len(values) != 1:
             raise TypeError("PathEnum requires exactly one argument")
         if not isinstance(values[0], (str, Path)):
@@ -18,18 +18,15 @@ class PathEnum(Path, ReprEnum):
         member._value_ = value
         return member
 
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values):
-        """
-        Return the lower-cased version of the member name.
-        """
-        return name.lower()
-
     def __getattr__(self, name):
         """
         Directly refer to the attribute's value.
         """
         return getattr(self._value_, name)
+
+    def __truediv__(self, other):
+        # Allow path operations directly on the enum member
+        return self._value_ / other
 
 
 __all__: list[str] = ["PathEnum"]
