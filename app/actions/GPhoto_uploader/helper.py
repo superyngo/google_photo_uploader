@@ -1,16 +1,12 @@
-import asyncio
-import zendriver as uc
+from zendriver import Browser
 from zendriver.cdp import network
-from app import config, tasks
-import logging
-
-logging.basicConfig(level=logging.ERROR)  #
 
 
 async def get_response(tab, url) -> int:
-    response_codes: dict[str, int] = {}
+
     await tab.send(network.enable())
 
+    response_codes: dict[str, int] = {}
     # Add a handler for ResponseReceived events
     tab.add_handler(
         network.ResponseReceived,
@@ -20,5 +16,6 @@ async def get_response(tab, url) -> int:
             else None
         ),
     )
+    await tab.get(url)
     await tab.send(network.disable())
     return response_codes[url]

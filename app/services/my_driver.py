@@ -43,6 +43,8 @@ async def init_my_driver(browser_config: MyDriverConfig | None = None) -> zd.Bro
     Returns:
         uc.Browser: browser
     """
+    global _instances
+
     browser_config = browser_config or {}
 
     browser_id: Path = browser_config.get("user_data_dir", Path())
