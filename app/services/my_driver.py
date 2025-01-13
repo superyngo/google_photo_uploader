@@ -1,11 +1,41 @@
 import zendriver as zd
+from zendriver import Tab
 from typing import TypedDict, NotRequired
 from pathlib import Path
 from ..utils import composer
 import time, os
+import time
+
+from zendriver.cdp import network
+
+response_codes: dict[str, int] = {}
+
+
+async def get_response(tab, url) -> int:
+
+    await tab.send(network.enable())
+
+    global response_codes
+    # Add a handler for ResponseReceived events
+    tab.add_handler(
+        network.ResponseReceived,
+        lambda e: (
+            response_codes.update({e.response.url: e.response.status})
+            if e.response.url == url
+            else None
+        ),
+    )
+    await tab.get(url)
+
+    while response_codes.get(url) is None:
+        time.sleep(1)
+
+    await tab.send(network.disable())
+    return response_codes[url]
+
 
 # Multiton state
-_instances: dict[Path, zd.Browser] = {}
+_instances: dict[Path, zd.Tab] = {}
 
 
 class MyDriverConfig(TypedDict):
@@ -34,7 +64,7 @@ async def _restart(self) -> None:
 # }
 
 
-async def init_my_driver(browser_config: MyDriverConfig | None = None) -> zd.Browser:
+async def init_my_driver(browser_config: MyDriverConfig | None = None) -> zd.Tab:
     """init a driver
 
     Args:
@@ -52,6 +82,9 @@ async def init_my_driver(browser_config: MyDriverConfig | None = None) -> zd.Bro
         return _instances[browser_id]
 
     browser: zd.Browser = await zd.start(**browser_config)
-    # do_compose: int = composer.compose(browser, {"restart": restart})
-    _instances[browser_id] = browser
-    return browser
+
+    tab: Tab = await browser.get("about:blank")
+
+    do_compose: int = composer.compose(tab, {"get_response": get_response})
+    _instances[browser_id] = tab
+    return tab

@@ -31,8 +31,7 @@ task: tasks.UploaderTask = {
 browser_config: MyDriverConfig = task.get("browser_config", {})
 tab: Tab = await init_my_driver(browser_config)
 
-do_get = await tab.get(task["GPhoto_url"])
-body, is_base64 = await tab.send(cdp.network.get_response_body(temp))
+res: int = await tab.get_response(task["GPhoto_url"])
 
 
 do_upload = await upload(browser, task)
@@ -41,15 +40,6 @@ do_upload = await upload(browser, task)
 async def upload(browser: Browser, task: UploaderTask) -> None:
 
     tab = await browser.get(task["GPhoto_url"])
-
-    if res["status"] == 404 and bool_headless:
-        self.driver.quit()
-        self.driver = None
-        self.login()
-        self.driver.get(self.config_data["album_url"])
-    elif res["status"] == 404:
-        self.login()
-        self.driver.get(self.config_data["album_url"])
 
     # Locate the input element by aria-label using XPath
     _add_photo_click = self.driver._wait_element(
