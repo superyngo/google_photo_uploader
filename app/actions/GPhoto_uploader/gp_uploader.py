@@ -1,7 +1,7 @@
 import asyncio
-from zendriver import Browser, Tab
-import zendriver as zd
-
+from nodriver import Browser, Tab
+import nodriver as zd
+from ...utils import logger
 from app.services.my_driver import MyDriverConfig
 from app.services import init_my_driver
 from app.models.tasks import UploaderTask
@@ -28,48 +28,29 @@ task: tasks.UploaderTask = {
     "browser_config": browser_config,
 }
 
-browser_config: MyDriverConfig = task.get("browser_config", {})
-tab: Tab = await init_my_driver(browser_config)
 
-res: int = await tab.get_response(task["GPhoto_url"])
+async def upload(tab: Tab, task: dict) -> None:
 
+    # Locate the 新增相片 and click
+    Add_New = await tab.find("//span[text()='新增相片']")
+    do = await Add_New.click()
+    logger.info("新增相片")
 
-do_upload = await upload(browser, task)
-
-
-async def upload(browser: Browser, task: UploaderTask) -> None:
-
-    tab = await browser.get(task["GPhoto_url"])
-
-    # Locate the input element by aria-label using XPath
-    _add_photo_click = self.driver._wait_element(
-        By.XPATH, '//button[@aria-label="新增相片"]'
-    ).click()
-    print("新增相片")
-    # Interact with the input element
-    _upload_click = self.driver._wait_element(
-        By.XPATH, '//span[text()="從電腦中選取"]'
-    ).click()
+    # Interact with the "Select from Computer" button
+    upload_button = await tab.find('//span[text()="從電腦中選取"]')
+    do = await upload_button.click()
     print("從電腦中選取")
-    file_input = self.driver.find_element(By.XPATH, '//input[@type="file"]')
-    files_path = self._list_mkv_files(self.config_data["mideo_folder"])
-    file_input.send_keys(files_path)
-    self.driver._wait_element(By.XPATH, f"//div[contains(text(), '你已備份')]")
+
+    # Locate the file input element
+    file_input = await tab.find('//input[@type="file"]')
+    folder: Path = task["local_album_path"]
+    mkv_files = [folder / file for file in os.listdir(folder) if file.endswith(".mkv")]
+
+    do = await file_input.send_file(*mkv_files)  # Set files for upload
+
+    # Wait for confirmation message
+    await tab.wait_for("", "你已備份")
     print("Upload successfully")
-    self.driver.quit()
-    self.driver = None
-
-
-def _list_mkv_files(self, mideo_folder: Path) -> str:
-    # Get all .mkv files in the folder
-    mkv_files = [
-        mideo_folder / file
-        for file in os.listdir(mideo_folder)
-        if file.endswith(".mkv")
-    ]
-    # Join the list of files into a single string separated by newline characters
-    mkv_files_str = "\n".join(str(mkv_files))
-    return mkv_files_str
 
 
 async def upload_handler(task: UploaderTask) -> int:
@@ -81,10 +62,13 @@ async def upload_handler(task: UploaderTask) -> int:
     Returns:
         _type_: Browser
     """
+
     browser_config: MyDriverConfig = task.get("browser_config", {})
-    browser: Browser = await init_my_driver(browser_config)
-    do_get = await browser.get(task["GPhoto_url"])
-    do_upload = await upload(browser, task)
+    tab: Tab = await init_my_driver(browser_config)
+
+    do_get = await tab.get(task["GPhoto_url"])
+
+    do_upload = await upload(tab, task)
     return 0
 
 

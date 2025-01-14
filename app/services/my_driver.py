@@ -1,12 +1,12 @@
-import zendriver as zd
-from zendriver import Tab
+import nodriver as zd
+from nodriver import Tab
 from typing import TypedDict, NotRequired
 from pathlib import Path
 from ..utils import composer
 import time, os
 import time
 
-from zendriver.cdp import network
+from nodriver.cdp import network
 
 response_codes: dict[str, int] = {}
 
