@@ -1,17 +1,20 @@
-import nodriver as zd
-from nodriver import Tab
+import nodriver as nd
+from nodriver import Tab, Browser
+from nodriver.cdp import network
 from typing import TypedDict, NotRequired
 from pathlib import Path
 from ..utils import composer
-import time, os
 import time
-
-from nodriver.cdp import network
-
-response_codes: dict[str, int] = {}
+from weakref import WeakValueDictionary
 
 
-async def get_response(tab, url) -> int:
+__all__: list[str] = ["init_my_driver", "MyDriverConfig", "browser_instances"]
+
+# Create a WeakValueDictionary
+response_codes: WeakValueDictionary[str, int] = WeakValueDictionary()
+
+
+async def get_response(tab: Tab, url: str) -> int:
 
     await tab.send(network.enable())
 
@@ -35,7 +38,7 @@ async def get_response(tab, url) -> int:
 
 
 # Multiton state
-_instances: dict[Path, zd.Tab] = {}
+browser_instances: WeakValueDictionary[Path, Browser] = WeakValueDictionary()
 
 
 class MyDriverConfig(TypedDict):
@@ -43,28 +46,7 @@ class MyDriverConfig(TypedDict):
     browser_executable_path: NotRequired[Path]
 
 
-# Restrart not working yet
-async def _restart(self) -> None:
-    await self.stop()
-    browser_config = {
-        k: v
-        for (k, v) in self.config.__dict__.items()
-        if k in ["user_data_dir", "browser_executable_path"]
-    }
-    browser_id: Path = browser_config.get("user_data_dir", Path())
-    _instances[browser_id] = await zd.start(**browser_config)
-    self = _instances[browser_id]
-
-
-# browser_config = {
-#     "user_data_dir": Path(config.AppPaths.APP_DATA) / name,
-#     "browser_executable_path": Path(
-#         r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-#     ),
-# }
-
-
-async def init_my_driver(browser_config: MyDriverConfig | None = None) -> zd.Tab:
+async def init_my_driver(browser_config: MyDriverConfig | None = None) -> Tab:
     """init a driver
 
     Args:
@@ -73,18 +55,31 @@ async def init_my_driver(browser_config: MyDriverConfig | None = None) -> zd.Tab
     Returns:
         uc.Browser: browser
     """
-    global _instances
-
+    global browser_instances
     browser_config = browser_config or {}
-
     browser_id: Path = browser_config.get("user_data_dir", Path())
-    if browser_id in _instances and not _instances[browser_id].stopped:
-        return _instances[browser_id]
 
-    browser: zd.Browser = await zd.start(**browser_config)
+    if browser_id in browser_instances and not browser_instances[browser_id].stopped:
+        browser: Browser = browser_instances[browser_id]
+    else:
+        browser: Browser = await nd.start(**browser_config)
 
     tab: Tab = await browser.get("about:blank")
 
     do_compose: int = composer.compose(tab, {"get_response": get_response})
-    _instances[browser_id] = tab
+    browser_instances[browser_id] = browser
+
     return tab
+
+
+# Restrart not working yet
+# async def _restart(browser: Browser) -> None:
+#     await self.stop()
+#     browser_config = {
+#         k: v
+#         for (k, v) in self.config.__dict__.items()
+#         if k in ["user_data_dir", "browser_executable_path"]
+#     }
+#     browser_id: Path = browser_config.get("user_data_dir", Path())
+#     browser_instances[browser_id] = await nd.start(**browser_config)
+#     self = browser_instances[browser_id]

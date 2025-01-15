@@ -1,41 +1,54 @@
-from modules.uploader import *
+import asyncio
+from pathlib import Path
+from app import config, tasks, upload_handler, browser_instances
+from app import logger
+import pdb
 
 
-CsUCUploader = cs_factory(dic_uploader_config)
-UCuploader = CsUCUploader()
+# sample
+name = "abc"
+browser_config: tasks.MyDriverConfig = {
+    "user_data_dir": Path(config.AppPaths.APP_DATA) / name,
+    "browser_executable_path": Path(
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+    ),
+}
 
-# menu = {
-#     'login': UCuploader.login,
-#     'register': UCuploader.register_config,
-#     'upload': UCuploader.upload_to_google_photo,
-# }
-# task = None
+task1: tasks.UploaderTask = {
+    "name": name,
+    "local_album_path": Path(
+        r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\cut_sl_speedup"
+    ),
+    "GPhoto_url": "https://photos.google.com/u/2/album/AF1QipPgIsi5cicSG2EPtPq_fD1mDUtvkTjdr4d16aGe",
+    "browser_config": browser_config,
+    "delete_after": True,
+}
 
-# while True:
-#     task = input(f"action:\n {'\n '.join(menu.keys())}\n")
-#     if input == 'quit':
-#         break
-#     menu[task]()
+upload_assignments: tasks.UploaderInfo = {"filename": Path(), "assignments": [task1]}
 
-UCuploader.upload_to_google_photo()
 
-import os
-import glob
-import time
+async def main():
+    assignments = upload_assignments.get("assignments")
+    logger.info(f"Start uploading tasks:{assignments}")
 
-def delete_mkv_files(directory):
-    # Search for all .mkv files in the directory (including subdirectories)
-    mkv_files = [os.path.join(directory, file) for file in os.listdir(directory)
-                 if file.endswith('.mkv') and os.path.isfile(os.path.join(directory, file))]
-    # Iterate through each .mkv file and delete it
-    for file in mkv_files:
-        try:
-            os.remove(file)
-            print(f"Deleted: {file}")
-        except Exception as e:
-            print(f"Error deleting {file}: {e}")
+    if assignments:
+        for task in assignments:
+            await upload_handler(task)
 
-# Example usage:
-directory_path = UCuploader.config_data['mideo_folder']  # Change this to your directory
-time.sleep(60)
-delete_mkv_files(directory_path)
+    logger.info(f"All tasks done, close all browsers")
+    keys = list(browser_instances.keys())
+    for key in keys:
+        if key in browser_instances:
+            browser_instances[key].stop()
+            del browser_instances[key]
+
+    # Your script code here
+    # print("This is a script in debug mode.")
+    # Set a breakpoint
+    # pdb.set_trace()
+
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+    loop.close()

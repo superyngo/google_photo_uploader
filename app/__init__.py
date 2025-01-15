@@ -2,8 +2,8 @@ from .config import config
 from . import utils
 from .utils import logger, load_assignment
 from .models import tasks
-
-from .actions.mideo_convertor import mideo_converter
+from .actions import mideo_convertor, upload_handler
+from .services import browser_instances
 
 # from .actions.GPhoto_uploader.gp_uploader import upload_handler
 
@@ -16,8 +16,9 @@ __all__: list[str] = [
     "config",
     "utils",
     "logger",
-    "mideo_converter",
+    "mideo_convertor",
     "upload_handler",
     "tasks",
     "load_assignment",
+    "tab_instances",
 ]

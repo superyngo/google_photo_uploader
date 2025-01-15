@@ -45,21 +45,22 @@ class UploaderTask(TypedDict):
     local_album_path: Path
     GPhoto_url: str
     browser_config: NotRequired[MyDriverConfig]
+    delete_after: NotRequired[bool]
 
 
 # Actions
 class AssignmentInfo(TypedDict):
-    filename: str
-    selected: set[int] | None
+    filename: Path
+    selected: NotRequired[set[int]]
 
 
 class SpeedupInfo(AssignmentInfo):
-    action: list[CutSlSpeedupTask]
+    assignments: list[CutSlSpeedupTask]
 
 
 class MideoMergerInfo(AssignmentInfo):
-    action: list[MideoMergerTask]
+    assignments: list[MideoMergerTask]
 
 
 class UploaderInfo(AssignmentInfo):
-    action: list[MyDriverConfig]
+    assignments: list[UploaderTask]

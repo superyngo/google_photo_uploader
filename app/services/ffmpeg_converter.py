@@ -30,7 +30,7 @@ class methods(StrEnum):
     ffmpeg_Error = auto()
 
 
-__ALL__: list[str] = [method.value for method in methods]
+# __all__: list[str] = [method.value for method in methods]
 
 
 class EncodeKwargs(TypedDict):
