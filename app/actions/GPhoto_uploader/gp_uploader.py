@@ -34,8 +34,8 @@ async def _upload(tab: Tab, folder: Path) -> int:
     # Locate the 新增相片 and click
     Add_New = await tab.find("//span[text()='新增相片']", timeout=999)
     if Add_New:
-        do = await Add_New.click()
         logger.info("新增相片")
+        do = await Add_New.click()
     else:
         logger.info("新增相片 not found")
         return 1
@@ -53,8 +53,10 @@ async def _upload(tab: Tab, folder: Path) -> int:
             });
         """
         )
-        do_click = await upload_button.click()
+        wait = await tab.wait(5)
+
         logger.info("從電腦中選取")
+        do_click = await upload_button.click()
     else:
         logger.info("從電腦中選取 not found")
         return 1
@@ -62,6 +64,7 @@ async def _upload(tab: Tab, folder: Path) -> int:
     # Locate the file input element
     file_input = await tab.find('//input[@type="file"]')
     if file_input:
+        logger.info("上傳相片")
         mkv_files: list[Path] = [
             folder / file for file in os.listdir(folder) if file.endswith(".mkv")
         ]

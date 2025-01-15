@@ -16,10 +16,8 @@ browser_config: tasks.MyDriverConfig = {
 
 task1: tasks.UploaderTask = {
     "name": name,
-    "local_album_path": Path(
-        r"D:\Users\user\OneDrive - Chunghwa Telecom Co., Ltd\文件\Projects\Python\sample\cut_sl_speedup"
-    ),
-    "GPhoto_url": "https://photos.google.com/u/2/album/AF1QipPgIsi5cicSG2EPtPq_fD1mDUtvkTjdr4d16aGe",
+    "local_album_path": Path(r"H:\data\94f827b4b94e"),
+    "GPhoto_url": "https://photos.google.com/u/0/album/AF1QipPgIsi5cicSG2EPtPq_fD1mDUtvkTjdr4d16aGe",
     "browser_config": browser_config,
     "delete_after": True,
 }
