@@ -29,59 +29,54 @@ __all__: list[str] = ["upload_handler"]
 # }
 
 
-async def _upload(tab: Tab, folder: Path) -> int:
+async def _upload(tab: Tab, mkv_files: list[Path]) -> int:
+
+    # Check all mkv files valid
+    for file in mkv_files:
+        if file.suffix != ".mkv":
+            logger.info(f"{file} is not mkv file")
+            return 1
 
     # Locate the 新增相片 and click
     Add_New = await tab.find("//span[text()='新增相片']", timeout=999)
-    if Add_New:
-        do = await Add_New.click()
-        logger.info("新增相片")
-    else:
+    if not Add_New:
         logger.info("新增相片 not found")
-        return 1
+        return 2
+    do = await Add_New.click()
+    logger.info("新增相片")
 
     # Interact with the "Select from Computer" button
     upload_button = await tab.find('//span[text()="從電腦中選取"]')
-    if upload_button:
-        do_stop_os_dialog = await tab.evaluate(
-            """
-            document.addEventListener('click', (event) => {
-            if (event.target.type === 'file') {
-                event.preventDefault(); // Prevent file dialog
-                console.log('File dialog prevented');
-            }
-            });
-        """
-        )
-        do_click = await upload_button.click()
-        logger.info("從電腦中選取")
-    else:
+    if not upload_button:
         logger.info("從電腦中選取 not found")
-        return 1
+        return 2
+    do_stop_os_dialog = await tab.evaluate(
+        """
+        document.addEventListener('click', (event) => {
+        if (event.target.type === 'file') {
+            event.preventDefault(); // Prevent file dialog
+            console.log('File dialog prevented');
+        }
+        });
+    """
+    )
+    do_click = await upload_button.click()
+    logger.info("從電腦中選取")
 
     # Locate the file input element
     file_input = await tab.find('//input[@type="file"]')
-    if file_input:
-        mkv_files: list[Path] = [
-            folder / file for file in os.listdir(folder) if file.endswith(".mkv")
-        ]
-
-        do = await file_input.send_file(*mkv_files)  # Set files for upload
-
-        # Wait for confirmation message
-        await tab.find("你已備份", timeout=999999999)
-        logger.info("Upload successfully")
-        return 0
-    else:
+    if not file_input:
         logger.info("upload not found")
-        return 1
+        return 2
+    do = await file_input.send_file(*mkv_files)  # Set files for upload
+
+    # Wait for confirmation message
+    await tab.find("你已備份", timeout=999999999)
+    logger.info("Upload successfully")
+    return 0
 
 
-def _delete_mkv_files(folder: Path) -> int:
-    # Search for all .mkv files in the directory (including subdirectories)
-    mkv_files: list[Path] = [
-        folder / file for file in os.listdir(folder) if file.endswith(".mkv")
-    ]
+def _delete_mkv_files(mkv_files: list[Path]) -> int:
     # Iterate through each .mkv file and delete it
     try:
         for file in mkv_files:
@@ -108,10 +103,10 @@ async def upload_handler(task: UploaderTask) -> int:
     tab: Tab = await init_my_driver(browser_config)
 
     do_get: Tab = await tab.get(task["GPhoto_url"])
-    folder: Path = task["local_album_path"]
-    do_upload: int = await _upload(tab, folder)
+    mkv_files: list[Path] = task.get("mkv_files", [Path()])
+    do_upload: int = await _upload(tab, mkv_files)
     await tab.wait(5)
-    do_delete: int = _delete_mkv_files(folder) if task.get("delete_after") else 0
+    do_delete: int = _delete_mkv_files(mkv_files) if task.get("delete_after") else 0
     return do_upload + do_delete
 
 

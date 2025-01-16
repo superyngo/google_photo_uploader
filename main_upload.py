@@ -1,3 +1,4 @@
+import os
 import asyncio
 from pathlib import Path
 from app import config, tasks, upload_handler, browser_instances
@@ -31,10 +32,24 @@ async def main():
     assignments = upload_assignments.get("assignments")
     logger.info(f"Start uploading tasks:{assignments}")
 
-    if assignments:
-        for task in assignments:
-            await upload_handler(task)
+    if not assignments:
+        logger.info("No assignment")
+        return
 
+    for task in assignments:
+        folder: Path = task["local_album_path"]
+        task["mkv_files"] = mkv_files = [
+            folder / file for file in os.listdir(folder) if file.endswith(".mkv")
+        ]
+
+        if not mkv_files:
+            logger.info(f"No mkv files in {folder}, pass")
+            return
+
+        logger.info(f"Start uploading {mkv_files} to {task["GPhoto_url"]}")
+        await upload_handler(task)
+
+    # Clear tabs
     logger.info(f"All tasks done, close all browsers")
     keys = list(browser_instances.keys())
     for key in keys:

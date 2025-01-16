@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
-from typing import LiteralString, TypedDict
-from enum import StrEnum, Enum, auto
+from typing import LiteralString
+from enum import StrEnum, auto
 from ..types.types import PathEnum
 
 
@@ -20,9 +20,9 @@ class Actions(StrEnum):
 
 # set app base path
 class AppPaths(PathEnum):
-    PROGRAM_DATA = Path(os.environ["APPDATA"]) / APP_NAME
-    APP_DATA = Path(os.environ["PROGRAMDATA"]) / APP_NAME
-    CONFIG = PROGRAM_DATA / "config.conf"
+    PROGRAM_DATA = Path(os.environ["PROGRAMDATA"]) / APP_NAME  # C:\ProgramData
+    APP_DATA = Path(os.environ["APPDATA"]) / APP_NAME  # C:\Users\user\AppData\Roaming
+    CONFIG = APP_DATA / "config.conf"
     LOGS = APP_DATA / "Logs"
 
 
