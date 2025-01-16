@@ -1,7 +1,5 @@
 import ffmpeg
-from ffmpeg import Error as ffmpeg_Error
-from ..utils import logger
-from typing import TypedDict, NotRequired, Sequence, Any
+from typing import Sequence
 from pathlib import Path
 from enum import StrEnum, auto
 from collections import deque
@@ -12,6 +10,8 @@ import tempfile
 import time
 import os
 import concurrent.futures
+from ...utils import logger
+from .types import EncodeKwargs
 
 
 class methods(StrEnum):
@@ -25,21 +25,7 @@ class methods(StrEnum):
     IS_VALID_VIDEO = auto()
     DETECT_NON_SILENCE = auto()
     CUT_SILENCE = auto()
-    CUT_SILENCE_RENDER = auto()
-    ENCODEKWARGS = auto()
-    ffmpeg_Error = auto()
-
-
-# __all__: list[str] = [method.value for method in methods]
-
-
-class EncodeKwargs(TypedDict):
-    video_track_timescale: NotRequired[int]
-    vcodec: NotRequired[str]
-    video_bitrate: NotRequired[int]
-    acodec: NotRequired[str]
-    ar: NotRequired[int]
-    f: NotRequired[str]
+    CUT_SILENCE_RERENDER = auto()
 
 
 def _gen_filter(

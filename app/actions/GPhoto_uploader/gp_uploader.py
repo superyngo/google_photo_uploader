@@ -3,7 +3,7 @@ from pathlib import Path
 import os
 from nodriver import Tab
 from ...utils import logger
-from ...services import init_my_driver, MyDriverConfig
+from ...services import my_driver
 from ...models.tasks import UploaderTask
 
 
@@ -98,8 +98,8 @@ async def upload_handler(task: UploaderTask) -> int:
         int: _description_
     """
 
-    browser_config: MyDriverConfig = task.get("browser_config", {})
-    tab: Tab = await init_my_driver(browser_config)
+    browser_config: my_driver.types.MyDriverConfig = task.get("browser_config", {})
+    tab: Tab = await my_driver.init_my_driver(browser_config)
 
     do_get: Tab = await tab.get(task["GPhoto_url"])
     mkv_files: list[Path] = task.get("mkv_files", [Path()])

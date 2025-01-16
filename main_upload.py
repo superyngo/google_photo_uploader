@@ -1,14 +1,14 @@
 import os
 import asyncio
 from pathlib import Path
-from app import config, tasks, upload_handler, browser_instances
-from app import logger
+from app import config, tasks, GPhoto_uploader, browser_instances, logger
+from app.services.my_driver.types import MyDriverConfig
 import pdb
 
 
 # sample
 name = "abc"
-browser_config: tasks.MyDriverConfig = {
+browser_config: MyDriverConfig = {
     "user_data_dir": Path(config.AppPaths.APP_DATA) / name,
     "browser_executable_path": Path(
         r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
@@ -56,7 +56,7 @@ async def main():
             return
 
         logger.info(f"Start uploading {mkv_files} to {task["GPhoto_url"]}")
-        await upload_handler(task)
+        await GPhoto_uploader.upload_handler(task)
 
     # Clear tabs
     logger.info(f"All tasks done, close all browsers")

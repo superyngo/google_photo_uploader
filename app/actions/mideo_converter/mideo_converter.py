@@ -260,7 +260,7 @@ def _cut_sl_speedup(
             continue
 
         if multiple != 0:
-            original_encode: ffmpeg_converter.EncodeKwargs = (
+            original_encode: ffmpeg_converter.types.EncodeKwargs = (
                 (ffmpeg_converter.probe_encoding_info(video)) if same_encode else {}
             )
 

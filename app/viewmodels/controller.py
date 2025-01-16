@@ -2,7 +2,7 @@ from ..models import tasks
 from ..config import config
 
 tasks.AssignmentInfo
-config.Actions.CONVERTOR
+config.Actions.converter
 
 
 def store_assignment():

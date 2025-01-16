@@ -1,14 +1,13 @@
 import nodriver as nd
 from nodriver import Tab, Browser
 from nodriver.cdp import network
-from typing import TypedDict, NotRequired
 from pathlib import Path
-from ..utils import composer
 import time
 from weakref import WeakValueDictionary
+from ...utils import composer
+from .types import MyDriverConfig
 
-
-__all__: list[str] = ["init_my_driver", "MyDriverConfig", "browser_instances"]
+__all__: list[str] = ["init_my_driver", "browser_instances"]
 
 # Create a WeakValueDictionary
 response_codes: WeakValueDictionary[str, int] = WeakValueDictionary()
@@ -39,11 +38,6 @@ async def get_response(tab: Tab, url: str) -> int:
 
 # Multiton state
 browser_instances: WeakValueDictionary[Path, Browser] = WeakValueDictionary()
-
-
-class MyDriverConfig(TypedDict):
-    user_data_dir: NotRequired[Path]
-    browser_executable_path: NotRequired[Path]
 
 
 async def init_my_driver(browser_config: MyDriverConfig | None = None) -> Tab:

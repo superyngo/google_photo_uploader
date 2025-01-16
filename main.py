@@ -3,8 +3,7 @@ from app import config
 from app.models.tasks import MideoMergerTask, CutSlSpeedupTask
 from pathlib import Path
 from app.utils import logger
-from app.services import ffmpeg_converter
-import ffmpeg
+from app.services.ffmpeg_converter import ffmpeg_converter
 
 
 file_path = Path(r"C:\Users\user\Downloads\2025-01-07_1736200862.mp4")
