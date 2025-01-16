@@ -11,12 +11,12 @@ def main() -> None:
         "start_hour": 6,
         "delete_after": True,
     }
-    mideo_convertor.merger_handler(**merge_task_info, valid_extensions={".mp4"})
+    mideo_convertor.merger_handler(**merge_task_info)
 
     cut_sl_speedup_task_info: CutSlSpeedupTask = {
         "folder_path": target_path,
         "multiple": 0,
-        "cut_sl_config": {"dB": -21},
+        "same_encode": False,
     }
     mideo_convertor.cut_sl_speedup_handler(**(cut_sl_speedup_task_info))
 
