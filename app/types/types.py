@@ -1,5 +1,6 @@
 from enum import Enum, ReprEnum
 from pathlib import Path
+from typing import TypedDict, NotRequired
 
 
 class PathEnum(Path, ReprEnum):
@@ -29,4 +30,4 @@ class PathEnum(Path, ReprEnum):
         return self._value_ / other
 
 
-__all__: list[str] = ["PathEnum"]
+__all__: list[str] = ["PathEnum", "CutSlConfig"]

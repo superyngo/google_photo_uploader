@@ -1,7 +1,7 @@
 from typing import TypedDict, NotRequired
 from pathlib import Path
 from ..services.my_driver import MyDriverConfig
-from collections.abc import Generator
+from ..actions.mideo_convertor.types import CutSlConfig
 
 
 class CsBasicComponent:
@@ -39,6 +39,7 @@ class CutSlSpeedupTask(TypedDict):
     folder_path: Path
     multiple: int | float
     same_encode: NotRequired[bool]
+    cut_sl_config: NotRequired[CutSlConfig]
 
 
 class UploaderTask(TypedDict):

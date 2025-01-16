@@ -1,9 +1,10 @@
-from ..utils import logger
-from ..services import ffmpeg_converter
+from ...utils import logger
+from ...services import ffmpeg_converter
 import os
 from datetime import datetime, timedelta, date
-from typing import TypedDict, NotRequired
+from typing import TypedDict
 from pathlib import Path
+from .types import CutSlConfig
 import re
 
 __all__: list[str] = ["merger_handler", "cut_sl_speedup_handler"]
@@ -124,7 +125,7 @@ def _merge_videos(
         # Sort the videos by epoch time
         sorted_videos = dict(sorted(videos.items()))
 
-        # Prepare the input file list for ffmpeg
+        # Prepare the input file list with valid check for ffmpeg
         input_files: list[Path] = []
         for video_path in sorted_videos.values():
             if ffmpeg_converter.is_valid_video(video_path):
@@ -136,7 +137,8 @@ def _merge_videos(
             continue
 
         # Write the input file list for ffmpeg
-        with open("input.txt", "w") as f:
+        temp_input: Path = Path(r"input.txt")
+        with open(temp_input, "w") as f:
             for file in input_files:
                 f.write(f"file '{file}'\n")
 
@@ -144,11 +146,11 @@ def _merge_videos(
         first_video_epoch = next(iter(sorted_videos))
 
         # Define the output file path
-        output_file: Path = save_path / f"{date_key}_{first_video_epoch}.mkv"
+        output_file: Path = save_path / f"{date_key}_{first_video_epoch}_merged.mkv"
         logger.info(f"{output_file = }")
         try:
             # Use ffmpeg to concatenate videos
-            ffmpeg_converter.merge("input.txt", output_file, **otherkwargs)
+            ffmpeg_converter.merge(temp_input, output_file, **otherkwargs)
         except ffmpeg_converter.ffmpeg_Error as e:
             logger.error(
                 f"Failed to concatenate videos for {date_key}. Error: {e.stderr.decode()}"
@@ -156,7 +158,7 @@ def _merge_videos(
             return 1
 
         # Remove the temporary input file list
-        os.remove("input.txt")
+        os.remove(temp_input)
 
         os.utime(output_file, (first_video_epoch, first_video_epoch))
 
@@ -183,7 +185,11 @@ def _merge_videos(
 
 
 def merger_handler(
-    folder_path: Path, start_hour: int = 6, delete_after: bool = True, **otherkwargs
+    folder_path: Path,
+    start_hour: int = 6,
+    delete_after: bool = True,
+    valid_extensions: set | None = None,
+    **otherkwargs,
 ) -> int:
     """_summary_
 
@@ -197,7 +203,6 @@ def merger_handler(
     """
     logger.info(f"Start merging videos in {folder_path}")
 
-    valid_extensions = otherkwargs.get("valid_extensions")
     video_files: list[Path] = _list_video_files(
         folder_path, valid_extensions=valid_extensions
     )
@@ -211,15 +216,9 @@ def merger_handler(
     return do_merge
 
 
-class CutSlConfig(TypedDict):
-    dB: NotRequired[int]
-    sl_duration: NotRequired[float]
-    seg_min_duration: NotRequired[float]
-
-
 def _cut_sl_speedup(
     input_folder: Path,
-    multiple: int | float,
+    multiple: int | float = 0,
     same_encode: bool = True,
     output_folder_name: str = "cut_sl_speedup",
     valid_extensions: set[str] = {".mkv", ".mp4"},
@@ -250,13 +249,6 @@ def _cut_sl_speedup(
         # Get the file's timestamp to the first video's epoch time
         video_epoch = _extract_epoch(video)
 
-        if same_encode:
-            original_encode: ffmpeg_converter.EncodeKwargs = (
-                ffmpeg_converter.probe_encoding_info(video)
-            )
-        else:
-            original_encode = {}
-
         output_file: Path = output_folder / (
             video.stem + "_" + output_folder_name + video.suffix
         )
@@ -268,6 +260,10 @@ def _cut_sl_speedup(
             continue
 
         if multiple != 0:
+            original_encode: ffmpeg_converter.EncodeKwargs = (
+                (ffmpeg_converter.probe_encoding_info(video)) if same_encode else {}
+            )
+
             ffmpeg_converter.speedup(
                 output_file, output_file, multiple, **(original_encode | otherkwargs)
             )
@@ -285,7 +281,10 @@ def _cut_sl_speedup(
 
 
 def cut_sl_speedup_handler(
-    folder_path: Path, multiple: int | float = 2, **otherkwargs
+    folder_path: Path,
+    multiple: int | float = 2,
+    cut_sl_config: CutSlConfig | None = None,
+    **otherkwargs,
 ) -> int:
     """_summary_
 
@@ -298,13 +297,20 @@ def cut_sl_speedup_handler(
     """
     logger.info(f"Start cutting silence and speed up videos in {folder_path}")
 
-    cut_sl_config: CutSlConfig = {
+    if cut_sl_config is None:
+        cut_sl_config = {}
+
+    defalut_cut_sl_config: CutSlConfig = {
         "dB": -25,
         "sl_duration": 0.1,
         "seg_min_duration": 0,
     }
+
     do_cut_si_speedup: int = _cut_sl_speedup(
-        folder_path, multiple, cut_sl_config=cut_sl_config, **otherkwargs
+        folder_path,
+        multiple,
+        cut_sl_config=defalut_cut_sl_config | cut_sl_config,
+        **otherkwargs,
     )
 
     return do_cut_si_speedup

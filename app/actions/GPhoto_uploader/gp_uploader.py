@@ -5,7 +5,6 @@ from nodriver import Tab
 from ...utils import logger
 from ...services import init_my_driver, MyDriverConfig
 from ...models.tasks import UploaderTask
-from ... import config
 
 
 __all__: list[str] = ["upload_handler"]
