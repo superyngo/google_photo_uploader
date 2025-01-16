@@ -197,7 +197,10 @@ def merger_handler(
     """
     logger.info(f"Start merging videos in {folder_path}")
 
-    video_files: list[Path] = _list_video_files(folder_path)
+    valid_extensions = otherkwargs.get("valid_extensions")
+    video_files: list[Path] = _list_video_files(
+        folder_path, valid_extensions=valid_extensions
+    )
 
     grouped_videos: GroupedVideos = _group_files_by_date(video_files, start_hour)
 

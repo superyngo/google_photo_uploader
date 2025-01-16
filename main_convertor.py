@@ -11,7 +11,7 @@ def main() -> None:
         "start_hour": 6,
         "delete_after": True,
     }
-    mideo_convertor.merger_handler(**merge_task_info)
+    mideo_convertor.merger_handler(**merge_task_info, valid_extensions={".mkv"})
 
     cut_sl_speedup_task_info: CutSlSpeedupTask = {
         "folder_path": target_path,
